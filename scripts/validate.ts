@@ -20,9 +20,15 @@ const requiredFiles = [
   "src/data/sample-spam-url-patterns.json",
   "src/tests/httpEndpoints.test.ts",
   "src/tests/fraudDecisionUx.test.ts",
+  "src/tests/checkKakaoMessage.test.ts",
+  "src/tests/questionIntentService.test.ts",
+  "src/services/questionIntentService.ts",
+  "src/services/decisionService.ts",
+  "src/mcp/tools/checkKakaoMessage.ts",
 ];
 
 const expectedTools = [
+  "check_kakao_message",
   "analyze_message_risk",
   "extract_risk_indicators",
   "check_phishing_url",
@@ -34,6 +40,7 @@ const expectedTools = [
 ];
 
 const toolFiles = [
+  "src/mcp/tools/checkKakaoMessage.ts",
   "src/mcp/tools/analyzeMessageRisk.ts",
   "src/mcp/tools/extractRiskIndicators.ts",
   "src/mcp/tools/checkPhishingUrl.ts",
@@ -67,7 +74,11 @@ async function collectTypeScriptFiles(directory: string): Promise<string[]> {
 }
 
 await Promise.all(requiredFiles.map((file) => access(resolve(process.cwd(), file))));
-if (TOOL_NAMES.length !== 8 || expectedTools.some((name) => !TOOL_NAMES.includes(name as (typeof TOOL_NAMES)[number]))) {
+if (
+  TOOL_NAMES.length !== 9
+  || TOOL_NAMES[0] !== "check_kakao_message"
+  || expectedTools.some((name) => !TOOL_NAMES.includes(name as (typeof TOOL_NAMES)[number]))
+) {
   throw new Error(`MCP 도구 등록 검증 실패: ${TOOL_NAMES.join(", ")}`);
 }
 
@@ -83,7 +94,8 @@ if (!responseSource.includes("safetyMessage") || !responseSource.includes("discl
 
 const decisionSources = await Promise.all([
   "src/mcp/schemas.ts",
-  "src/services/fraudDecisionService.ts",
+  "src/services/decisionService.ts",
+  "src/services/questionIntentService.ts",
   "src/services/riskRuleEngine.ts",
 ].map((file) => readFile(resolve(process.cwd(), file), "utf8")));
 const combinedDecisionSource = decisionSources.join("\n");
@@ -140,7 +152,7 @@ try {
   await client.connect(clientTransport);
   const listed = await client.listTools();
   const registered = listed.tools.map(({ name }) => name);
-  if (registered.length !== 8 || expectedTools.some((name) => !registered.includes(name))) {
+  if (registered.length !== 9 || expectedTools.some((name) => !registered.includes(name))) {
     throw new Error(`MCP tools/list 검증 실패: ${registered.join(", ")}`);
   }
 } finally {
@@ -149,5 +161,5 @@ try {
 }
 
 console.log(
-  `필수 파일 ${requiredFiles.length}개, 판단 UX 필드 8개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, MCP tools/list 도구 ${TOOL_NAMES.length}개, 문서 방향·버전·원문 로그 금지 패턴 확인 완료`,
+  `필수 파일 ${requiredFiles.length}개, 판단 UX 필드 8개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, 대표 도구 포함 MCP tools/list 도구 ${TOOL_NAMES.length}개, 문서 방향·버전·원문 로그 금지 패턴 확인 완료`,
 );

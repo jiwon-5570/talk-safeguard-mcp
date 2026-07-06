@@ -38,10 +38,11 @@
 
 AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 MVP입니다. 향후 AI 분류를 추가하더라도 최종 안전 문구와 점수 경계는 서버 규칙이 통제하도록 설계했습니다.
 
-## MCP 도구 8개
+## MCP 도구 9개
 
 | 도구 | 역할 |
 |---|---|
+| `check_kakao_message` | 대표 통합 도구. 메시지와 질문을 받아 판단, 진행 가능 여부, 근거, 체크리스트와 다음 행동을 한 번에 반환 |
 | `analyze_message_risk` | “눌러도 되는지·송금해도 되는지·믿어도 되는지”에 대한 판단 요약, 근거, 체크리스트와 다음 행동 생성 |
 | `extract_risk_indicators` | URL, 전화·계좌·사업자번호 후보, 금액, 긴급·민감정보 요구 추출 |
 | `check_phishing_url` | URL 위험도와 클릭 가능 여부, 도메인 근거, 공식 확인 절차 반환 |
@@ -52,6 +53,8 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 | `generate_safe_action_guide` | 사용자 상황별 진행 가능 여부, 즉시 행동, 확인 체크리스트와 신고 경로 생성 |
 
 모든 도구 응답은 `safetyMessage`와 `disclaimer`를 포함합니다.
+
+처음 사용하는 클라이언트는 `check_kakao_message`를 호출하면 됩니다. 세부 URL·사업자·통신판매업·투자 분석이 필요할 때 나머지 전문 도구를 이어서 사용할 수 있습니다.
 
 `analyze_message_risk`의 핵심 응답은 `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
 
@@ -123,7 +126,7 @@ npm run validate
 npm run build
 ```
 
-`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, MCP 도구 8개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
+`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, 대표 도구를 포함한 MCP 도구 9개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
 
 ## Docker
 
@@ -141,7 +144,7 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 1. 이 서버를 외부에서 접근 가능한 HTTPS 환경에 배포합니다.
 2. `https://배포도메인/health`와 `https://배포도메인/mcp`를 확인합니다.
 3. PlayMCP 개발자 화면에서 새 MCP 서버를 만들고 Streamable HTTP 서버 URL로 `https://배포도메인/mcp`를 등록합니다.
-4. 도구 탐색 결과에 위 8개 도구가 모두 나타나는지 확인하고, 데모 프롬프트로 호출 결과를 점검합니다.
+4. 도구 탐색 결과에 `check_kakao_message`가 첫 번째로 표시되고 위 9개 도구가 모두 나타나는지 확인한 뒤 데모 프롬프트로 호출 결과를 점검합니다.
 5. 서비스 설명, 개인정보 처리 원칙, 이용 공공데이터와 안전 고지를 입력합니다.
 6. 공모전 제출 시 공개 범위와 참가 상태를 공식 공모전 안내에 맞게 설정합니다.
 
@@ -234,4 +237,4 @@ MCP 서버는 메시지 원문이나 대화 상태를 저장하지 않습니다.
 - [ ] `/health` 확인
 - [ ] `/mcp/info` 확인
 - [ ] `/mcp` 등록 확인
-- [ ] MCP tool 8개 확인
+- [ ] 대표 `check_kakao_message`와 MCP tool 9개 확인

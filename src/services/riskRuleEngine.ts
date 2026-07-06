@@ -3,7 +3,7 @@ import { extractRiskIndicators, scamKeywords, type RiskIndicators } from "../uti
 import { processEphemeral } from "../utils/privacy.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
 import { analyzePhishingUrl } from "./phishingUrlService.js";
-import { buildFraudDecision, type FraudDecision } from "./fraudDecisionService.js";
+import { buildFraudDecision, type FraudDecision } from "./decisionService.js";
 import { generateSafetyGuide, scamTypeLabel } from "./safetyGuideService.js";
 
 export interface ScamClassification {
@@ -225,6 +225,7 @@ export function analyzeMessage(
       reasons,
       indicators,
       immediateActions: guide.immediateActions,
+      doNotActions: guide.doNotActions,
       reportGuide: guide.reportGuide,
       incidentReportSummary: guide.incidentReportSummary,
     });

@@ -29,7 +29,7 @@
 
 ## MCP 도구
 
-`analyze_message_risk`, `extract_risk_indicators`, `check_phishing_url`, `classify_scam_type`, `verify_business_info`, `verify_online_seller`, `check_investment_room_risk`, `generate_safe_action_guide` 등 총 8개입니다.
+대표 통합 도구 `check_kakao_message`와 기존 전문 도구 `analyze_message_risk`, `extract_risk_indicators`, `check_phishing_url`, `classify_scam_type`, `verify_business_info`, `verify_online_seller`, `check_investment_room_risk`, `generate_safe_action_guide` 등 총 9개입니다.
 
 ## 공공데이터 활용
 
@@ -60,7 +60,7 @@ API 키가 없는 심사·시연 환경에서도 데이터 형식을 반영한 �
 5. 시니어, 청년 투자자, 공동구매·중고거래 이용자까지 대상이 넓습니다.
 6. 메시지·전화번호·계좌번호 원문을 저장하지 않는 안전 설계를 적용했습니다.
 7. API 키 없이 sample 모드로 완전한 시연이 가능하고 실제 공공데이터로 확장할 수 있습니다.
-8. PlayMCP에서 바로 탐색·호출할 수 있는 MCP tool 8개를 유지합니다.
+8. PlayMCP에서 바로 쓸 수 있는 대표 `check_kakao_message`와 전문 MCP tool 8개를 함께 제공합니다.
 
 ## 기대효과
 

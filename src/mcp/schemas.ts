@@ -58,6 +58,11 @@ export const AnalyzeMessageInputSchema = MessageInputSchema.extend({
   userQuestion: z.string().trim().min(1).max(500).optional(),
 });
 
+export const CheckKakaoMessageInputSchema = MessageInputSchema.extend({
+  question: z.string().trim().min(1).max(500).optional(),
+  userSituation: UserSituationSchema.optional().default("unknown"),
+});
+
 export const CheckUrlInputSchema = z.object({
   url: z.string().trim().min(1).max(2_048),
 });

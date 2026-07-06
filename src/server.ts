@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import { analyzeMessageRiskTool } from "./mcp/tools/analyzeMessageRisk.js";
+import { checkKakaoMessageTool } from "./mcp/tools/checkKakaoMessage.js";
 import { checkInvestmentRoomRiskTool } from "./mcp/tools/checkInvestmentRoomRisk.js";
 import { checkPhishingUrlTool } from "./mcp/tools/checkPhishingUrl.js";
 import { classifyScamTypeTool } from "./mcp/tools/classifyScamType.js";
@@ -13,6 +14,7 @@ import { verifyBusinessInfoTool } from "./mcp/tools/verifyBusinessInfo.js";
 import { verifyOnlineSellerTool } from "./mcp/tools/verifyOnlineSeller.js";
 import {
   AnalyzeMessageInputSchema,
+  CheckKakaoMessageInputSchema,
   CheckUrlInputSchema,
   MessageInputSchema,
   SafeActionGuideInputSchema,
@@ -24,9 +26,11 @@ import { logger } from "./utils/logger.js";
 
 export const SERVICE_NAME = "talk-safeguard-mcp";
 export const SERVICE_VERSION = "1.1.0";
-export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지 위험 신호 분석 MCP";
+export const PRIMARY_TOOL = "check_kakao_message";
+export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지에 대해 눌러도 되는지, 송금해도 되는지, 믿어도 되는지를 행동 전에 확인하는 사기 위험 판단 보조 MCP";
 
 export const TOOL_NAMES = [
+  "check_kakao_message",
   "analyze_message_risk",
   "extract_risk_indicators",
   "check_phishing_url",
@@ -40,6 +44,15 @@ export const TOOL_NAMES = [
 export function createTalkSafeguardServer(): McpServer {
   const server = new McpServer({ name: SERVICE_NAME, version: SERVICE_VERSION });
 
+  server.registerTool(
+    "check_kakao_message",
+    {
+      title: "카카오톡 메시지 사기 위험 확인",
+      description: "카카오톡 메시지와 사용자의 질문을 받아 눌러도 되는지, 송금해도 되는지, 믿어도 되는지에 직접 답합니다.",
+      inputSchema: CheckKakaoMessageInputSchema,
+    },
+    async (input) => toToolResult(checkKakaoMessageTool(input)),
+  );
   server.registerTool(
     "analyze_message_risk",
     {
@@ -233,6 +246,7 @@ export function createHttpApp() {
       service: SERVICE_NAME,
       version: SERVICE_VERSION,
       tools: TOOL_NAMES.length,
+      primaryTool: PRIMARY_TOOL,
       privacyMode: "no-message-storage",
       messageLogging: false,
       dataRetention: "none",
@@ -246,7 +260,10 @@ export function createHttpApp() {
       service: SERVICE_NAME,
       version: SERVICE_VERSION,
       description: SERVICE_DESCRIPTION,
+      primaryTool: PRIMARY_TOOL,
+      toolCount: TOOL_NAMES.length,
       tools: TOOL_NAMES,
+      purpose: SERVICE_DESCRIPTION,
       privacyMode: "no-message-storage",
       dataMode: {
         phishing: process.env.PHISHING_DATA_MODE ?? "sample",

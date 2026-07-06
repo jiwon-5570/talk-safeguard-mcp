@@ -72,7 +72,7 @@ function withBusinessDecision(value: BusinessVerificationBase): BusinessVerifica
     canTrustSeller,
     remainingRisks: [
       "사업자등록 상태가 정상이어도 거래 안전을 보장하지 않습니다.",
-      "개인계좌 선입금, 안전결제 거부, 카톡 주문만 가능하다는 조건은 별도 위험 신호입니다.",
+      "개인계좌 선입금, 안전결제 거부, 카톡 주문만 가능, 지나치게 낮은 가격은 별도 위험 신호입니다.",
       "정상 사업자 정보가 제3자에게 도용되었을 가능성도 확인해야 합니다.",
     ],
     transactionChecklist: [
