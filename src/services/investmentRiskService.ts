@@ -1,8 +1,13 @@
-import type { RiskLevel } from "../mcp/schemas.js";
+import type { CanProceed, RiskLevel } from "../mcp/schemas.js";
 import { loadJsonData } from "../utils/dataLoader.js";
 
 export interface InvestmentRiskAnalysis {
   riskLevel: RiskLevel;
+  investmentDecision: string;
+  canJoinRoom: CanProceed;
+  canDepositMoney: CanProceed;
+  redFlags: string[];
+  verificationChecklist: string[];
   suspiciousSignals: string[];
   policyBasedWarnings: string[];
   recommendedActions: string[];
@@ -21,9 +26,29 @@ export function analyzeInvestmentRoomRisk(message: string): InvestmentRiskAnalys
   else if (suspiciousSignals.length >= 3 || (hasGuarantee && hasExternalDeposit)) riskLevel = "HIGH";
   else if (suspiciousSignals.length >= 1 || /리딩방/u.test(message)) riskLevel = "MEDIUM";
 
+  const redFlags = [
+    ...suspiciousSignals,
+    ...(/매일\s*\d+(?:\.\d+)?%/u.test(message) ? ["구체적인 일일 고수익 약속"] : []),
+    ...(hasExternalDeposit ? ["해외거래소·개인계좌 입금 유도"] : []),
+  ];
+  const highRisk = riskLevel === "HIGH" || riskLevel === "CRITICAL";
   return {
     riskLevel,
-    suspiciousSignals: [...suspiciousSignals, ...(/매일\s*\d+(?:\.\d+)?%/u.test(message) ? ["구체적인 일일 고수익 약속"] : [])],
+    investmentDecision: highRisk
+      ? "원금 보장·고수익 약속·외부 입금 유도 신호가 있어 이 투자방에 참여하거나 입금하지 않는 것이 안전합니다."
+      : riskLevel === "MEDIUM"
+        ? "투자 권유 위험 신호가 있어 운영 주체와 금융회사 등록 여부를 확인하기 전에는 참여하지 마세요."
+        : "현재 규칙에서 뚜렷한 투자 사기 신호는 적지만 투자방의 안전이나 수익을 보장할 수 없습니다.",
+    canJoinRoom: highRisk ? "NO" : "CHECK_FIRST",
+    canDepositMoney: riskLevel === "LOW" ? "CHECK_FIRST" : "NO",
+    redFlags: [...new Set(redFlags)],
+    verificationChecklist: [
+      "금융감독원 파인에서 운영 업체가 제도권 금융회사인지 확인하세요.",
+      "원금 보장, 확정 수익, 손실 없음 표현이 있는지 확인하세요.",
+      "해외거래소 가입이나 개인계좌 입금을 요구하는지 확인하세요.",
+      "수익 인증 화면이 아닌 공식 공시와 등록 정보를 확인하세요.",
+    ],
+    suspiciousSignals: redFlags,
     policyBasedWarnings: [
       ...(hasGuarantee ? ["투자에서 원금·수익을 보장하거나 손실이 없다고 단정하는 홍보는 중대한 위험 신호입니다."] : []),
       ...(hasExternalDeposit ? ["외부 거래소 가입이나 개인계좌 입금 유도는 자금 회수 위험을 높일 수 있습니다."] : []),

@@ -9,7 +9,7 @@ flowchart LR
   S --> M[Stateless /mcp]
   M --> R[MCP tool 8개]
   R --> E[규칙·URL·공공데이터 분석]
-  E --> A[안전 행동·공유문·신고 요약]
+  E --> A[판단·근거·체크리스트·다음 행동]
   A --> U
 ```
 
@@ -25,7 +25,7 @@ flowchart LR
 2. `classifyMessage`가 가족·기관·카카오 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자·선입금 등 복합 규칙으로 유형을 분류합니다.
 3. `analyzeMessage`가 신호별 가중치와 위험 조합의 최소 점수를 적용해 0~100 점수를 계산합니다.
 4. `scoreToRiskLevel`이 LOW, MEDIUM, HIGH, CRITICAL로 변환합니다.
-5. `generateSafetyGuide`가 현재 사용자 상황과 유형에 맞는 금지 행동, 즉시 조치, 가족방 공유문과 상담 요약을 만듭니다.
+5. `buildFraudDecision`과 `generateSafetyGuide`가 질문에 대한 직접 답변, 진행 가능 여부, 확인 체크리스트, 금지 행동, 즉시 조치와 상담 요약을 만듭니다.
 
 ## URL 분석 흐름
 

@@ -1,11 +1,19 @@
+import type { CanProceed } from "../mcp/schemas.js";
 import { normalizeBusinessNumber } from "./businessRegistryService.js";
 
-export interface OnlineSellerVerification {
+interface OnlineSellerVerificationBase {
   registered: boolean | null;
   status: string;
   source: string;
   warnings: string[];
   safeAction: string;
+}
+
+export interface OnlineSellerVerification extends OnlineSellerVerificationBase {
+  sellerDecision: string;
+  canProceedWithPurchase: CanProceed;
+  remainingRisks: string[];
+  safePurchaseChecklist: string[];
 }
 
 interface UnknownRecord {
@@ -17,12 +25,34 @@ const sampleSellers = [
   { businessNumber: "1111111111", companyName: "휴업 데모상점", status: "휴업" },
 ];
 
+function withSellerDecision(value: OnlineSellerVerificationBase): OnlineSellerVerification {
+  const inactive = /휴업|폐업|취소/u.test(value.status);
+  return {
+    ...value,
+    sellerDecision: inactive
+      ? "통신판매사업자 상태가 정상 영업으로 확인되지 않아 구매를 진행하지 않는 것이 안전합니다."
+      : "통신판매사업자 등록 여부만으로 거래 안전을 보장할 수 없습니다. 판매자 정보와 결제 조건을 추가로 확인하세요.",
+    canProceedWithPurchase: inactive ? "NO" : "CHECK_FIRST",
+    remainingRisks: [
+      "통신판매업 등록이 확인되어도 판매자 신원과 거래 안전이 보장되지는 않습니다.",
+      "개인계좌 선입금, 안전결제 거부, 지나치게 낮은 가격은 별도 위험 신호입니다.",
+      "등록된 상호·대표자·주소와 실제 판매자 정보가 다를 수 있습니다.",
+    ],
+    safePurchaseChecklist: [
+      "공정거래위원회 공식 조회 화면에서 상호·대표자·주소를 교차 확인하세요.",
+      "사업자등록번호와 입금 계좌 명의가 일치하는지 확인하세요.",
+      "구매자 보호가 적용되는 플랫폼 안전결제를 사용하세요.",
+      "카톡 주문만 가능하거나 외부 결제를 유도하면 결제를 중단하세요.",
+    ],
+  };
+}
+
 function fallback(businessNumber?: string, companyName?: string, fallbackWarning?: string): OnlineSellerVerification {
   const normalized = businessNumber === undefined ? undefined : normalizeBusinessNumber(businessNumber);
   const match = sampleSellers.find(
     (seller) => seller.businessNumber === normalized || (companyName !== undefined && seller.companyName.includes(companyName)),
   );
-  return {
+  return withSellerDecision({
     registered: match === undefined ? null : true,
     status: match?.status ?? "샘플에서 확인되지 않음",
     source: "공정거래위원회 통신판매사업자 데이터 형식 기반 sample fallback",
@@ -32,7 +62,7 @@ function fallback(businessNumber?: string, companyName?: string, fallbackWarning
       "통신판매업 등록이 확인되어도 거래 위험 가능성이 0이 되거나 거래 안전이 보장되는 것은 아닙니다.",
     ],
     safeAction: "공정거래위원회 공식 조회 화면에서 상호·대표자·주소를 교차 확인하고 안전결제를 사용하세요.",
-  };
+  });
 }
 
 function findItems(value: unknown): UnknownRecord[] {
@@ -84,13 +114,13 @@ export async function verifyOnlineSellerRegistration(
     const items = findItems(await response.json());
     const first = items[0];
     const status = String(first?.["operSttusNm"] ?? first?.["status"] ?? (items.length > 0 ? "등록 확인" : "등록 정보 없음"));
-    return {
+    return withSellerDecision({
       registered: items.length > 0,
       status,
       source: "공정거래위원회 통신판매사업자 등록현황 제공 서비스",
       warnings: ["통신판매업 등록이 확인되어도 거래 위험 가능성이 0이 되거나 거래 안전이 보장되는 것은 아닙니다."],
       safeAction: "조회된 상호·대표자·주소가 판매자가 제시한 정보와 같은지 확인하고 안전결제를 사용하세요.",
-    };
+    });
   } catch {
     return fallback(
       businessRegistrationNumber,

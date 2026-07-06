@@ -1,6 +1,6 @@
 {
   "name": "talk-safeguard-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "카카오톡 의심 메시지의 위험 신호를 공공데이터와 규칙 기반 분석으로 점검하는 MCP 서버",
   "type": "module",
   "main": "dist/index.js",

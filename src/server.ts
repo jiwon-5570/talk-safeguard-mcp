@@ -23,7 +23,7 @@ import { toToolResult } from "./mcp/responses.js";
 import { logger } from "./utils/logger.js";
 
 export const SERVICE_NAME = "talk-safeguard-mcp";
-export const SERVICE_VERSION = "1.0.0";
+export const SERVICE_VERSION = "1.1.0";
 export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지 위험 신호 분석 MCP";
 
 export const TOOL_NAMES = [
@@ -44,7 +44,7 @@ export function createTalkSafeguardServer(): McpServer {
     "analyze_message_risk",
     {
       title: "카카오톡 메시지 종합 위험 분석",
-      description: "메시지의 사칭·송금·링크·개인정보·앱 설치 신호를 분석해 위험도와 안전 행동을 안내합니다.",
+      description: "메시지의 위험 신호를 분석하고 사용자의 질문에 진행 가능 여부, 근거, 확인 체크리스트와 다음 행동으로 답합니다.",
       inputSchema: AnalyzeMessageInputSchema,
     },
     async (input) => toToolResult(analyzeMessageRiskTool(input)),
@@ -62,7 +62,7 @@ export function createTalkSafeguardServer(): McpServer {
     "check_phishing_url",
     {
       title: "피싱 URL 점검",
-      description: "URL을 정규화하고 공공데이터 형식 기반 샘플 및 의심 도메인 규칙과 비교합니다.",
+      description: "URL을 정규화하고 의심 도메인 규칙과 비교해 링크를 열어도 되는지와 공식 확인 방법을 안내합니다.",
       inputSchema: CheckUrlInputSchema,
     },
     async (input) => toToolResult(checkPhishingUrlTool(input)),
@@ -98,7 +98,7 @@ export function createTalkSafeguardServer(): McpServer {
     "check_investment_room_risk",
     {
       title: "투자 리딩방 위험 분석",
-      description: "원금·수익 보장, 고수익, 해외거래소 가입과 입금 유도 신호를 분석합니다.",
+      description: "원금·수익 보장, 고수익, 해외거래소 유도 신호를 분석해 투자방 참여·입금 가능 여부를 안내합니다.",
       inputSchema: MessageInputSchema,
     },
     async (input) => toToolResult(checkInvestmentRoomRiskTool(input)),
@@ -107,7 +107,7 @@ export function createTalkSafeguardServer(): McpServer {
     "generate_safe_action_guide",
     {
       title: "상황별 안전 대응 가이드",
-      description: "클릭·송금·앱 설치·정보 제공 여부에 맞춘 즉시 대응과 공식 신고 경로를 안내합니다.",
+      description: "클릭·송금·앱 설치·정보 제공 여부에 맞춰 진행 가능 여부, 즉시 행동, 확인 체크리스트와 신고 경로를 안내합니다.",
       inputSchema: SafeActionGuideInputSchema,
     },
     async (input) => toToolResult(generateSafeActionGuideTool(input)),

@@ -1,4 +1,4 @@
-import type { RiskLevel } from "../mcp/schemas.js";
+import type { CanProceed, RiskLevel } from "../mcp/schemas.js";
 import { loadJsonData } from "../utils/dataLoader.js";
 import { tryNormalizeUrl } from "../utils/normalizeUrl.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
@@ -18,6 +18,10 @@ export interface PhishingUrlAnalysis {
   matchedKnownPattern: boolean;
   matchedDataSource: string;
   suspiciousSignals: string[];
+  canOpen: CanProceed;
+  urlDecision: string;
+  domainSummary: string;
+  officialCheckGuide: string[];
   safeAction: string;
 }
 
@@ -57,6 +61,10 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
       matchedKnownPattern: false,
       matchedDataSource: "heuristic",
       suspiciousSignals: ["URL 형식을 정상적으로 해석할 수 없습니다."],
+      canOpen: "NO",
+      urlDecision: "URL 형식을 확인할 수 없어 열지 않는 것이 안전합니다.",
+      domainSummary: "도메인을 정상적으로 추출하지 못했습니다.",
+      officialCheckGuide: ["메시지의 링크 대신 해당 기관의 공식 앱이나 직접 입력한 공식 홈페이지를 이용하세요."],
       safeAction: "링크를 열지 말고 발신자가 주장하는 기관의 공식 앱이나 대표번호에서 직접 확인하세요.",
     };
   }
@@ -105,6 +113,23 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
     : spamSignals.length > 0
       ? "sample-spam-url-patterns"
       : "heuristic";
+  const canOpen: CanProceed = riskLevel === "HIGH" || riskLevel === "CRITICAL"
+    ? "NO"
+    : riskLevel === "LOW" && isOfficialDomain
+      ? "YES"
+      : "CHECK_FIRST";
+  const urlDecision = canOpen === "NO"
+    ? `공식 도메인으로 확인되지 않거나 복합 위험 신호가 있어 ${hostname} 링크를 누르지 않는 것이 안전합니다.`
+    : canOpen === "YES"
+      ? "등록된 공식 허용 도메인과 일치하고 현재 규칙에서 뚜렷한 위험 신호가 적습니다. 그래도 링크 자체의 안전을 보장하지는 않습니다."
+      : "현재 정보만으로 링크의 안전을 확인할 수 없습니다. 공식 앱이나 직접 입력한 공식 주소에서 먼저 확인하세요.";
+  const officialCheckGuide = [
+    "메시지 속 링크 대신 해당 서비스의 공식 앱이나 직접 입력한 공식 홈페이지에서 같은 안내가 있는지 확인하세요.",
+    "주소창의 실제 도메인이 공식 도메인과 철자까지 정확히 일치하는지 확인하세요.",
+    ...(hostname.includes("kakao")
+      ? ["카카오톡 또는 카카오페이 공식 앱에서 이벤트·계정 알림을 직접 확인하세요."]
+      : []),
+  ];
 
   const base = {
     normalizedUrl: normalized.normalizedUrl,
@@ -114,6 +139,12 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
     matchedKnownPattern,
     matchedDataSource,
     suspiciousSignals,
+    canOpen,
+    urlDecision,
+    domainSummary: isOfficialDomain
+      ? `${hostname}은 현재 등록된 공식 허용 도메인 범위와 일치합니다.`
+      : `${hostname}은 공식 허용 도메인으로 확인되지 않았으며 별도 검증이 필요합니다.`,
+    officialCheckGuide,
     safeAction:
       riskLevel === "LOW"
         ? "링크만으로 안전을 보장할 수 없으므로 공식 앱이나 직접 입력한 공식 주소에서 한 번 더 확인하세요."

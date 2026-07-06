@@ -1,10 +1,19 @@
 export type BusinessStatus = "ACTIVE" | "CLOSED" | "SUSPENDED" | "UNKNOWN" | "API_NOT_CONFIGURED";
 
-export interface BusinessVerification {
+import type { CanProceed } from "../mcp/schemas.js";
+
+interface BusinessVerificationBase {
   status: BusinessStatus;
   source: string;
   warnings: string[];
   safeAction: string;
+}
+
+export interface BusinessVerification extends BusinessVerificationBase {
+  businessDecision: string;
+  canTrustSeller: CanProceed;
+  remainingRisks: string[];
+  transactionChecklist: string[];
 }
 
 interface NtsStatusItem {
@@ -50,6 +59,31 @@ function decodeApiKey(value: string): string {
   }
 }
 
+function withBusinessDecision(value: BusinessVerificationBase): BusinessVerification {
+  const canTrustSeller: CanProceed = value.status === "CLOSED" || value.status === "SUSPENDED" ? "NO" : "CHECK_FIRST";
+  const businessDecision = value.status === "ACTIVE"
+    ? "사업자등록 상태가 정상이어도 거래 안전을 보장하지 않습니다. 판매자 정보와 결제 조건을 추가로 확인하세요."
+    : value.status === "CLOSED" || value.status === "SUSPENDED"
+      ? "현재 사업자 상태로는 거래를 진행하지 않는 것이 안전합니다. 공식 조회 결과와 판매자 설명을 다시 확인하세요."
+      : "사업자 상태를 충분히 확인하지 못했습니다. 확인 전에는 판매자를 신뢰하거나 송금하지 마세요.";
+  return {
+    ...value,
+    businessDecision,
+    canTrustSeller,
+    remainingRisks: [
+      "사업자등록 상태가 정상이어도 거래 안전을 보장하지 않습니다.",
+      "개인계좌 선입금, 안전결제 거부, 카톡 주문만 가능하다는 조건은 별도 위험 신호입니다.",
+      "정상 사업자 정보가 제3자에게 도용되었을 가능성도 확인해야 합니다.",
+    ],
+    transactionChecklist: [
+      "국세청 공식 경로에서 사업자 상태를 다시 확인하세요.",
+      "공정거래위원회에서 통신판매사업자 등록 정보를 확인하세요.",
+      "판매자 상호·대표자·주소·입금 계좌 명의가 서로 일치하는지 확인하세요.",
+      "개인계좌 선입금 대신 구매자 보호가 적용되는 안전결제를 사용하세요.",
+    ],
+  };
+}
+
 function fallback(number: string, warning?: string): BusinessVerification {
   const configuredStatus = sampleBusinesses[number];
   const warnings = [
@@ -57,12 +91,12 @@ function fallback(number: string, warning?: string): BusinessVerification {
     "현재 결과는 공모전 시연용 로컬 샘플이며 실시간 국세청 조회 결과가 아닙니다.",
     "사업자등록 상태가 정상이어도 거래 상대방의 신원이나 거래 안전을 보장하지 않습니다.",
   ];
-  return {
+  return withBusinessDecision({
     status: configuredStatus ?? "API_NOT_CONFIGURED",
     source: "국세청 사업자등록정보 형식 기반 sample fallback",
     warnings,
     safeAction: "국세청·홈택스 등 공식 경로와 판매자 명의, 결제 수단을 함께 확인하고 개인계좌 선입금은 피하세요.",
-  };
+  });
 }
 
 export async function verifyBusinessRegistration(
@@ -72,12 +106,12 @@ export async function verifyBusinessRegistration(
 ): Promise<BusinessVerification> {
   const number = normalizeBusinessNumber(businessRegistrationNumber);
   if (number.length !== 10) {
-    return {
+    return withBusinessDecision({
       status: "UNKNOWN",
       source: "입력 형식 검사",
       warnings: ["사업자등록번호는 숫자 10자리여야 합니다.", "번호 형식만으로 거래 안전을 판단할 수 없습니다."],
       safeAction: "정확한 사업자등록번호를 다시 확인하고 공식 조회 경로를 이용하세요.",
-    };
+    });
   }
 
   const checksumWarning = hasValidBusinessNumberChecksum(number)
@@ -108,12 +142,12 @@ export async function verifyBusinessRegistration(
       ...(checksumWarning === undefined ? [] : [checksumWarning]),
       "사업자등록 상태가 정상이어도 거래 상대방의 신원이나 거래 안전을 보장하지 않습니다.",
     ];
-    return {
+    return withBusinessDecision({
       status: mapStatus(body.data?.[0]),
       source: "국세청 사업자등록정보 진위확인 및 상태조회 서비스",
       warnings,
       safeAction: "사업자 상태와 통신판매업 신고를 함께 확인하고 안전결제 등 구매자 보호 수단을 사용하세요.",
-    };
+    });
   } catch {
     return fallback(number, "국세청 API 호출에 실패하여 로컬 샘플로 대체했습니다.");
   }
