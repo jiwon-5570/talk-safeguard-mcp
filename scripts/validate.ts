@@ -19,6 +19,7 @@ const requiredFiles = [
   "src/data/sample-phishing-urls.json",
   "src/data/sample-spam-url-patterns.json",
   "src/tests/httpEndpoints.test.ts",
+  "src/tests/fraudDecisionUx.test.ts",
 ];
 
 const expectedTools = [
@@ -79,6 +80,41 @@ const responseSource = await readFile(resolve(process.cwd(), "src/mcp/responses.
 if (!responseSource.includes("safetyMessage") || !responseSource.includes("disclaimer")) {
   throw new Error("공통 안전 고지 필드 구현을 찾을 수 없습니다.");
 }
+
+const decisionSources = await Promise.all([
+  "src/mcp/schemas.ts",
+  "src/services/fraudDecisionService.ts",
+  "src/services/riskRuleEngine.ts",
+].map((file) => readFile(resolve(process.cwd(), file), "utf8")));
+const combinedDecisionSource = decisionSources.join("\n");
+for (const field of [
+  "decisionSummary",
+  "verdict",
+  "canProceed",
+  "userQuestionAnswer",
+  "verificationChecklist",
+  "evidenceSummary",
+  "nextStepGuide",
+  "incidentReportSummary",
+]) {
+  if (!combinedDecisionSource.includes(field)) throw new Error(`사기 확인 UX 필드 구현 누락: ${field}`);
+}
+if (!combinedDecisionSource.includes("VerdictSchema") || !combinedDecisionSource.includes("CanProceedSchema")) {
+  throw new Error("verdict 또는 canProceed 공통 타입 구현을 찾을 수 없습니다.");
+}
+
+const readme = await readFile(resolve(process.cwd(), "README.md"), "utf8");
+if (!readme.includes("이 링크 눌러도 돼")) throw new Error("README 실제 사용자 질문 예시가 누락되었습니다.");
+if ((readme.match(/가족방 공유/gu) ?? []).length > 1) {
+  throw new Error("README에서 가족방 공유가 핵심 기능처럼 반복되고 있습니다.");
+}
+const demoPrompts = await readFile(resolve(process.cwd(), "demo-prompts.md"), "utf8");
+if (!demoPrompts.includes("실제 사용자 질문형 데모")) throw new Error("demo-prompts 실제 사용자 질문형 데모가 누락되었습니다.");
+
+const packageJson = JSON.parse(await readFile(resolve(process.cwd(), "package.json"), "utf8")) as { version?: string };
+if (packageJson.version !== "1.1.0" || !serverSource.includes('SERVICE_VERSION = "1.1.0"')) {
+  throw new Error("package.json과 HTTP 서비스 버전이 1.1.0으로 일치하지 않습니다.");
+}
 for (const toolFile of toolFiles) {
   const source = await readFile(resolve(process.cwd(), toolFile), "utf8");
   if (!source.includes("withSafety")) throw new Error(`안전 고지 적용 누락: ${toolFile}`);
@@ -97,7 +133,7 @@ for (const sourceFile of sourceFiles) {
 }
 
 const server = createTalkSafeguardServer();
-const client = new Client({ name: "talk-safeguard-validator", version: "1.0.0" });
+const client = new Client({ name: "talk-safeguard-validator", version: "1.1.0" });
 const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 try {
   await server.connect(serverTransport);
@@ -113,5 +149,5 @@ try {
 }
 
 console.log(
-  `필수 파일 ${requiredFiles.length}개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, MCP tools/list 도구 ${TOOL_NAMES.length}개, 원문 로그 금지 패턴 확인 완료`,
+  `필수 파일 ${requiredFiles.length}개, 판단 UX 필드 8개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, MCP tools/list 도구 ${TOOL_NAMES.length}개, 문서 방향·버전·원문 로그 금지 패턴 확인 완료`,
 );

@@ -3,6 +3,7 @@ import { extractRiskIndicators, scamKeywords, type RiskIndicators } from "../uti
 import { processEphemeral } from "../utils/privacy.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
 import { analyzePhishingUrl } from "./phishingUrlService.js";
+import { buildFraudDecision, type FraudDecision } from "./fraudDecisionService.js";
 import { generateSafetyGuide, scamTypeLabel } from "./safetyGuideService.js";
 
 export interface ScamClassification {
@@ -13,14 +14,16 @@ export interface ScamClassification {
   explanation: string;
 }
 
-export interface MessageRiskAnalysis {
+export interface MessageRiskAnalysis extends FraudDecision {
   riskScore: number;
   riskLevel: RiskLevel;
   scamTypes: ScamType[];
   reasons: string[];
   prohibitedActions: string[];
   recommendedActions: string[];
+  /** @deprecated 하위 호환 필드. decisionSummary와 nextStepGuide를 사용하세요. */
   familyShareMessage: string;
+  /** @deprecated incidentReportSummary를 사용하세요. */
   reportSummaryTemplate: string;
 }
 
@@ -145,6 +148,7 @@ export function analyzeMessage(
   message: string,
   userSituation: UserSituation = "unknown",
   receivedVia: ReceivedVia = "unknown",
+  userQuestion?: string,
 ): MessageRiskAnalysis {
   return processEphemeral(message, (ephemeralMessage) => {
     const indicators: RiskIndicators = extractRiskIndicators(ephemeralMessage);
@@ -211,7 +215,21 @@ export function analyzeMessage(
       sensitiveInfoRequested: authRequest || indicators.sensitiveInfoRequests.length > 0,
       receivedVia,
     });
+    const fraudDecision = buildFraudDecision({
+      message: ephemeralMessage,
+      ...(userQuestion === undefined ? {} : { userQuestion }),
+      userSituation,
+      riskScore,
+      riskLevel,
+      scamTypes: classification.primaryType === "UNKNOWN_RISK" ? ["UNKNOWN_RISK"] : types,
+      reasons,
+      indicators,
+      immediateActions: guide.immediateActions,
+      reportGuide: guide.reportGuide,
+      incidentReportSummary: guide.incidentReportSummary,
+    });
     return {
+      ...fraudDecision,
       riskScore,
       riskLevel,
       scamTypes: classification.primaryType === "UNKNOWN_RISK" ? ["UNKNOWN_RISK"] : types,

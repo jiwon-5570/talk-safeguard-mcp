@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const endpoint = new URL(process.env.MCP_URL ?? "http://127.0.0.1:3000/mcp");
-const client = new Client({ name: "talk-safeguard-http-smoke", version: "1.0.0" });
+const client = new Client({ name: "talk-safeguard-http-smoke", version: "1.1.0" });
 const transport = new StreamableHTTPClientTransport(endpoint);
 
 try {

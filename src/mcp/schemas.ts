@@ -3,6 +3,19 @@ import { z } from "zod";
 export const RiskLevelSchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type RiskLevel = z.infer<typeof RiskLevelSchema>;
 
+export const VerdictSchema = z.enum([
+  "SAFE_LIKELY",
+  "NEEDS_CAUTION",
+  "SUSPICIOUS",
+  "HIGHLY_SUSPICIOUS",
+  "URGENT_ACTION",
+  "INSUFFICIENT_INFO",
+]);
+export type Verdict = z.infer<typeof VerdictSchema>;
+
+export const CanProceedSchema = z.enum(["YES", "NO", "CHECK_FIRST"]);
+export type CanProceed = z.infer<typeof CanProceedSchema>;
+
 export const UserSituationSchema = z.enum([
   "before_click",
   "clicked_link",
@@ -42,6 +55,7 @@ export const MessageInputSchema = z.object({
 export const AnalyzeMessageInputSchema = MessageInputSchema.extend({
   userSituation: UserSituationSchema.optional().default("unknown"),
   receivedVia: ReceivedViaSchema.optional().default("unknown"),
+  userQuestion: z.string().trim().min(1).max(500).optional(),
 });
 
 export const CheckUrlInputSchema = z.object({

@@ -51,17 +51,21 @@ describe("안전 표현 및 개인정보 원칙", () => {
     expect(result.businessRegistrationNumbers).toContain("1234567890");
   });
 
-  it("위험 유형별 가족 공유문과 개인정보 비저장 신고 요약을 만든다", () => {
+  it("핵심 판단 필드와 개인정보 비저장 신고 요약을 만든다", () => {
     const result = analyzeMessageRiskTool({
       message: "엄마 나 폰 고장났어. 구글 기프트카드 사서 핀번호 사진 보내줘. 전화는 안 돼.",
       userSituation: "before_click",
       receivedVia: "direct_chat",
     });
 
-    expect(result.familyShareMessage).toMatch(/가족|지인/);
-    expect(result.familyShareMessage).toMatch(/상품권|핀번호/);
-    expect(result.reportSummaryTemplate).toContain("받은 경로: 개인톡");
-    expect(result.reportSummaryTemplate).toContain("원문을 저장하지 않음");
-    expect(result.reportSummaryTemplate).toContain("송금 요구");
+    expect(result.decisionSummary).toContain("위험");
+    expect(result.verdict).toBe("HIGHLY_SUSPICIOUS");
+    expect(result.canProceed).toBe("NO");
+    expect(result.verificationChecklist.join(" ")).toMatch(/가족|지인/);
+    expect(result.nextStepGuide.join(" ")).toMatch(/상품권|핀번호/);
+    expect(result.incidentReportSummary).toContain("받은 경로: 개인톡");
+    expect(result.incidentReportSummary).toContain("원문을 저장하지 않음");
+    expect(result.incidentReportSummary).toContain("송금 요구");
+    expect(result.familyShareMessage).toContain("하위 호환");
   });
 });

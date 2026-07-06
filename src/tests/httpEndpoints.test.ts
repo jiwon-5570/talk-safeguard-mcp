@@ -30,6 +30,7 @@ describe("HTTP 운영 endpoint", () => {
 
     expect(response.status).toBe(200);
     expect(body["tools"]).toBe(8);
+    expect(body["version"]).toBe("1.1.0");
     expect(body["messageLogging"]).toBe(false);
     expect(body["dataRetention"]).toBe("none");
     expect(body["timestamp"]).toEqual(expect.any(String));
@@ -38,10 +39,11 @@ describe("HTTP 운영 endpoint", () => {
   it("/mcp/info가 8개 도구와 데이터 모드를 공개한다", async () => {
     const baseUrl = await startApp();
     const response = await fetch(`${baseUrl}/mcp/info`);
-    const body = await response.json() as { tools: string[]; privacyMode: string; dataMode: Record<string, string> };
+    const body = await response.json() as { version: string; tools: string[]; privacyMode: string; dataMode: Record<string, string> };
 
     expect(response.status).toBe(200);
     expect(body.tools).toEqual(TOOL_NAMES);
+    expect(body.version).toBe("1.1.0");
     expect(body.privacyMode).toBe("no-message-storage");
     expect(body.dataMode["business"]).toBe("api-or-fallback");
   });

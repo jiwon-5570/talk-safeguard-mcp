@@ -1,11 +1,17 @@
-import type { ReceivedVia, RiskLevel, ScamType, UserSituation } from "../mcp/schemas.js";
+import type { CanProceed, ReceivedVia, RiskLevel, ScamType, UserSituation } from "../mcp/schemas.js";
 import { INCIDENT_SAFETY_MESSAGE, SAFETY_MESSAGE } from "../mcp/responses.js";
 
 export interface SafetyGuide {
+  situationSummary: string;
+  canProceed: CanProceed;
   immediateActions: string[];
   doNotActions: string[];
+  verificationChecklist: string[];
   reportGuide: string[];
+  incidentReportSummary: string;
+  /** @deprecated 하위 호환 필드. decisionSummary와 nextStepGuide를 사용하세요. */
   familyShareMessage: string;
+  /** @deprecated incidentReportSummary를 사용하세요. */
   reportSummaryTemplate: string;
   safetyMessage: string;
 }
@@ -120,23 +126,28 @@ function typeSpecificActions(scamType: ScamType): string[] {
   return [];
 }
 
-function familyShareMessage(scamType: ScamType, riskLevel: RiskLevel): string {
+function verificationChecklist(scamType: ScamType): string[] {
+  const checklist = ["메시지와 별개의 공식 앱·공식 홈페이지·대표번호에서 내용을 직접 확인하세요."];
   if (scamType === "FAMILY_IMPERSONATION" || scamType === "GIFT_CARD_SCAM") {
-    return "⚠️ 가족/지인 사칭 의심 메시지 주의\n\n‘폰 고장’, ‘전화 안 됨’, ‘급히 송금·상품권 구매’ 같은 말이 함께 나오면 위험 신호입니다. 돈이나 핀번호를 보내기 전에 기존에 저장된 번호로 직접 전화해 확인해 주세요.";
-  }
-  if (scamType === "INVESTMENT_ROOM") {
-    return "⚠️ 투자 리딩방 주의\n\n‘원금 보장’, ‘매일 수익’, ‘VIP방’, ‘해외거래소 가입’은 위험 신호입니다. 링크 가입이나 입금 전 금융감독원·공식 금융기관을 통해 확인해 주세요.";
+    checklist.push("기존에 저장된 가족·지인 번호로 직접 전화해 요청 사실을 확인하세요.");
   }
   if (scamType === "SHOPPING_PREPAYMENT" || scamType === "USED_MARKET_PREPAYMENT") {
-    return "⚠️ 카톡 주문/선입금 거래 주의\n\n사업자등록이 정상이어도 거래 안전이 보장되지는 않습니다. 개인계좌 선입금, 안전결제 거부, 카톡 주문만 가능하다는 조건은 주의가 필요합니다.";
+    checklist.push("사업자등록·통신판매업 정보를 확인하고 안전결제 가능 여부를 확인하세요.");
   }
-  if (scamType === "ACCOUNT_TAKEOVER" || scamType === "KAKAO_BRAND_IMPERSONATION" || scamType === "AUTH_CODE_REQUEST") {
-    return "⚠️ 카카오 계정·이벤트 사칭 링크 주의\n\n계정 제한 해제나 이벤트 당첨을 이유로 비밀번호·인증번호 입력을 요구하면 위험 신호입니다. 링크를 열지 말고 카카오 공식 앱에서 직접 확인해 주세요.";
+  if (scamType === "INVESTMENT_ROOM") {
+    checklist.push("금융감독원 파인에서 제도권 금융회사 여부와 원금·수익 보장 표현을 확인하세요.");
   }
-  if (["DELIVERY_SMISHING", "INVITATION_SMISHING", "PUBLIC_NOTICE_SMISHING"].includes(scamType)) {
-    return "⚠️ 생활 안내를 가장한 스미싱 링크 주의\n\n택배·청첩장·부고·과태료 안내에 링크가 포함되어 있다면 바로 열지 마세요. 공식 앱이나 기존 연락처로 내용을 먼저 확인해 주세요.";
+  if (["ACCOUNT_TAKEOVER", "AUTH_CODE_REQUEST", "KAKAO_BRAND_IMPERSONATION"].includes(scamType)) {
+    checklist.push("카카오 공식 앱의 계정·보안 화면에서 제한이나 이벤트 여부를 확인하세요.");
   }
-  return `[공유용 안전 알림] 이 메시지에서 ${levelLabel(riskLevel)} 수준의 위험 신호가 감지되었습니다. 링크·송금·앱 설치·개인정보 입력을 멈추고 기존 연락처나 공식 대표번호로 직접 확인해 주세요.`;
+  return checklist;
+}
+
+function guideCanProceed(userSituation: UserSituation, riskLevel: RiskLevel): CanProceed {
+  if (["clicked_link", "sent_money", "installed_app", "shared_info"].includes(userSituation)) return "NO";
+  if (riskLevel === "HIGH" || riskLevel === "CRITICAL") return "NO";
+  if (riskLevel === "MEDIUM") return "CHECK_FIRST";
+  return "YES";
 }
 
 export function generateSafetyGuide(
@@ -157,22 +168,27 @@ export function generateSafetyGuide(
         "의심 메시지는 한국인터넷진흥원 118 등 공식 상담 경로에서 확인할 수 있습니다.",
         "신고가 필요할 경우 대화 캡처·URL·발생 시각을 보존하세요.",
       ];
+  const incidentReportSummary = [
+    "[상담/신고용 요약]",
+    `- 의심 유형: ${scamTypeLabel(scamType)}`,
+    `- 위험 수준: ${riskLevel} (${levelLabel(riskLevel)})`,
+    `- 받은 경로: ${receivedViaLabels[context.receivedVia ?? "unknown"]}`,
+    `- 포함 요소: 링크 ${context.hasUrl === true ? "있음" : "없음 또는 미확인"} / 송금 요구 ${context.transferRequested === true ? "있음" : "없음 또는 미확인"} / 앱 설치 요구 ${context.appInstallRequested === true ? "있음" : "없음 또는 미확인"} / 인증번호·개인정보 요구 ${context.sensitiveInfoRequested === true ? "있음" : "없음 또는 미확인"}`,
+    `- 현재 상황: ${situationLabels[userSituation]}`,
+    `- 권장 조치: ${urgentIncident || riskLevel === "CRITICAL" ? "추가 행동을 중단하고 은행 고객센터·경찰 112·금융감독원 1332 등 공식 경로에 즉시 문의" : "링크·송금을 중단하고 기존 연락처 또는 공식 대표번호로 사실 확인"}`,
+    "- 개인정보 처리: 이 서버는 메시지 원문을 저장하지 않음",
+  ].join("\n");
 
   return {
+    situationSummary: `현재 상황은 ${situationLabels[userSituation]}이며 위험 수준은 ${levelLabel(riskLevel)}입니다.`,
+    canProceed: guideCanProceed(userSituation, riskLevel),
     immediateActions: [...situationActions[userSituation], ...typeActions],
     doNotActions: situationDoNot[userSituation],
+    verificationChecklist: verificationChecklist(scamType),
     reportGuide,
-    familyShareMessage: familyShareMessage(scamType, riskLevel),
-    reportSummaryTemplate: [
-      "[상담/신고용 요약]",
-      `- 의심 유형: ${scamTypeLabel(scamType)}`,
-      `- 위험 수준: ${riskLevel} (${levelLabel(riskLevel)})`,
-      `- 받은 경로: ${receivedViaLabels[context.receivedVia ?? "unknown"]}`,
-      `- 포함 요소: 링크 ${context.hasUrl === true ? "있음" : "없음 또는 미확인"} / 송금 요구 ${context.transferRequested === true ? "있음" : "없음 또는 미확인"} / 앱 설치 요구 ${context.appInstallRequested === true ? "있음" : "없음 또는 미확인"} / 인증번호·개인정보 요구 ${context.sensitiveInfoRequested === true ? "있음" : "없음 또는 미확인"}`,
-      `- 현재 상황: ${situationLabels[userSituation]}`,
-      `- 권장 조치: ${urgentIncident || riskLevel === "CRITICAL" ? "추가 행동을 중단하고 은행 고객센터·경찰 112·금융감독원 1332 등 공식 경로에 즉시 문의" : "링크·송금을 중단하고 기존 연락처 또는 공식 대표번호로 사실 확인"}`,
-      "- 개인정보 처리: 이 서버는 메시지 원문을 저장하지 않음",
-    ].join("\n"),
+    incidentReportSummary,
+    familyShareMessage: "이 필드는 하위 호환을 위해 유지됩니다. 핵심 안내는 decisionSummary와 nextStepGuide를 확인하세요.",
+    reportSummaryTemplate: incidentReportSummary,
     safetyMessage: urgentIncident ? INCIDENT_SAFETY_MESSAGE : SAFETY_MESSAGE,
   };
 }
