@@ -61,7 +61,9 @@ npm run dev
 macOS/Linux에서는 `cp .env.example .env`를 사용합니다. 서버는 기본적으로 다음 주소를 제공합니다.
 
 - 상태 확인: `GET http://localhost:3000/health`
+- 서비스·도구 정보: `GET http://localhost:3000/mcp/info`
 - MCP Streamable HTTP: `POST http://localhost:3000/mcp`
+- 개발·심사 종합 분석: `POST http://localhost:3000/debug/analyze` (`ENABLE_DEBUG_ENDPOINT=true`일 때만)
 
 프로덕션 실행:
 
@@ -82,10 +84,15 @@ npm start
 | `FTC_ONLINE_SELLER_API_KEY` | 빈 값 | 공정위 공공데이터 API 키 |
 | `PHISHING_DATA_MODE` | `sample` | 피싱 데이터 모드(현재 MVP는 sample) |
 | `SPAM_URL_DATA_MODE` | `sample` | 스팸 URL 데이터 모드(현재 MVP는 sample) |
+| `PUBLIC_DATA_MODE` | `sample` | `actual`일 때만 국세청·공정위 API 호출, 실패 시 sample fallback |
 | `LOG_LEVEL` | `info` | 서버 구조 로그 수준 |
-| `ALLOWED_ORIGINS` | 빈 값 | 쉼표로 구분한 허용 Origin. 비어 있으면 필터 미적용 |
+| `ENABLE_DEBUG_ENDPOINT` | `true` | `/debug/analyze` 활성화. 운영에서는 `false` 권장 |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | IP 해시 기준 요청 제한 시간 |
+| `RATE_LIMIT_MAX` | `60` | 제한 시간당 최대 요청 수 |
+| `TRUST_PROXY` | `false` | 신뢰할 수 있는 단일 reverse proxy 뒤에서만 `true` |
+| `ALLOWED_ORIGINS` | 빈 값 | 쉼표 구분 Origin. 개발에서는 허용, production에서 비어 있으면 교차 출처 요청 거부 |
 
-API 키가 없거나 공식 API 호출이 실패해도 sample fallback으로 도구가 응답합니다. 이 경우 결과에 실시간 조회가 아니라는 경고가 포함됩니다.
+`PUBLIC_DATA_MODE=sample`에서는 API 키 유무와 관계없이 재현 가능한 로컬 sample fallback을 사용합니다. `PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출하며, 키가 없거나 호출에 실패하면 서버 전체 장애 없이 sample fallback으로 전환합니다. 응답의 `source`와 `warnings`에서 실제 조회인지 fallback인지 확인할 수 있습니다.
 
 ## 테스트와 검증
 
@@ -96,7 +103,7 @@ npm run validate
 npm run build
 ```
 
-`validate`는 TypeScript strict 타입 검사, 테스트, 필수 파일 존재 여부, MCP 도구 8개 등록을 확인합니다. 테스트는 가족 사칭, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화, 모든 도구의 안전 고지를 포함합니다.
+`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, MCP 도구 8개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
 
 ## Docker
 
@@ -118,9 +125,11 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 5. 서비스 설명, 개인정보 처리 원칙, 이용 공공데이터와 안전 고지를 입력합니다.
 6. 공모전 제출 시 공개 범위와 참가 상태를 공식 공모전 안내에 맞게 설정합니다.
 
-공개 배포 전에는 `ALLOWED_ORIGINS`, 인증/인가, 요청 속도 제한, HTTPS, 비밀키 관리, 운영 모니터링을 배포 플랫폼에서 추가해야 합니다. 서버 로그에는 메시지 본문을 남기지 마세요.
+서버는 `helmet`, CORS allowlist, 메모리 rate limit을 기본 적용합니다. 공개 배포 전에는 HTTPS, 접근 정책, 비밀키 관리와 운영 모니터링을 배포 플랫폼에서 추가하고 서버 로그에는 메시지 본문을 남기지 마세요.
 
 ## 안전 정책
+
+상세 운영 기준과 취약점 제보 절차는 [SECURITY.md](./SECURITY.md)를 참고하세요.
 
 - 개인, 전화번호, 계좌번호를 범죄자 또는 범죄 수단으로 단정하지 않습니다.
 - “사기 가능성”, “위험 신호”, “공식 경로 확인 권장”으로 표현합니다.
@@ -129,6 +138,8 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 - 분석 결과만으로 신고 필요성을 배제하거나 링크의 안전을 보장하지 않습니다.
 
 ## 개인정보 처리 원칙
+
+외부 API 전송 항목과 보관 정책은 [PRIVACY.md](./PRIVACY.md), 전체 요청 흐름은 [ARCHITECTURE.md](./ARCHITECTURE.md)를 참고하세요.
 
 - 사용자 메시지는 요청 처리 중 메모리의 호출 스택에서만 사용하며 파일, 데이터베이스, 캐시, 분석 로그에 저장하지 않습니다.
 - 로거 인터페이스는 이벤트명과 위험 등급 같은 비식별 메타데이터만 허용하고, 메시지·URL·전화·계좌 원문을 전달하지 않습니다.
@@ -139,3 +150,56 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 ## 데모
 
 발표용 입력은 [demo-prompts.md](./demo-prompts.md), 공모전 요약은 [submission-summary.md](./submission-summary.md)를 참고하세요.
+
+## 실제 사용 예시
+
+```text
+사용자:
+이 카톡 위험해?
+“엄마 나 폰 고장났어. 급하게 80만원만 보내줘. 전화는 안 돼.”
+
+톡세이프가드:
+위험도 CRITICAL.
+가족/지인 사칭 위험 신호가 있습니다.
+송금하지 말고 기존에 저장된 번호로 직접 전화해 확인하세요.
+```
+
+개발·심사 환경에서는 같은 흐름을 HTTP로도 확인할 수 있습니다.
+
+```bash
+curl -X POST http://localhost:3000/debug/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"message":"엄마 나 폰 고장났어. 급하게 80만원만 보내줘. 전화는 안 돼.","userSituation":"before_click"}'
+```
+
+응답에는 종합 분석, 위험 요소 추출, 사기 유형 분류, URL 분석, 투자 키워드 분석(해당 시), `safetyMessage`, `disclaimer`가 포함됩니다. 운영에서는 `ENABLE_DEBUG_ENDPOINT=false`로 비활성화하세요.
+
+## 카카오톡에 꼭 필요한 이유
+
+- 가족방과 지인 관계를 악용한 메신저피싱에 송금 전 한 번 더 확인하게 합니다.
+- 오픈채팅 투자 리딩방의 원금 보장·해외거래소 입금 유도를 함께 점검합니다.
+- 카톡 주문·공동구매·중고거래의 개인계좌 선입금 위험을 알립니다.
+- 카카오페이·선물하기·이벤트·계정 보호를 사칭한 링크를 점검합니다.
+- 가족방 공유문으로 시니어와 디지털 취약 이용자에게 안전 행동을 확산합니다.
+- 피해 확정 판정보다 사용자가 행동하기 전 멈추고 공식 경로로 확인하도록 돕는 예방형 MCP입니다.
+
+## 실사용 한계
+
+- 규칙과 데이터에 없는 새로운 수법을 포함해 모든 사기를 100% 탐지할 수 없습니다.
+- 정상 사업자나 통신판매업 정보도 사칭·도용될 수 있어 거래 안전을 보장하지 않습니다.
+- 피싱 URL 데이터는 최신성이 중요하며 sample 데이터는 실시간 차단 목록이 아닙니다.
+- LOW 결과도 안전 보증이 아니며 최종 확인은 사용자가 공식 기관·기존 연락처로 직접 해야 합니다.
+- 이미 송금·앱 설치·정보 제공이 발생했다면 은행 고객센터, 경찰 112, 금융감독원 1332 등 공식 경로를 즉시 이용해야 합니다.
+
+## 배포 전 체크리스트
+
+- [ ] HTTPS 적용
+- [ ] `ALLOWED_ORIGINS` 설정
+- [ ] API 키를 GitHub에 커밋하지 않기
+- [ ] `NODE_ENV=production`
+- [ ] `ENABLE_DEBUG_ENDPOINT=false` 권장
+- [ ] rate limit 값 설정
+- [ ] `/health` 확인
+- [ ] `/mcp/info` 확인
+- [ ] `/mcp` 등록 확인
+- [ ] MCP tool 8개 확인

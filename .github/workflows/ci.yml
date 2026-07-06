@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feature/production-hardening]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Validate
+        run: npm run validate
+
+      - name: Build Docker image
+        run: docker build -t talk-safeguard-mcp .

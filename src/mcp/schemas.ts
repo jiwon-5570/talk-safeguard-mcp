@@ -13,14 +13,22 @@ export const UserSituationSchema = z.enum([
 ]);
 export type UserSituation = z.infer<typeof UserSituationSchema>;
 
+export const ReceivedViaSchema = z.enum(["kakao", "open_chat", "group_chat", "direct_chat", "unknown"]);
+export type ReceivedVia = z.infer<typeof ReceivedViaSchema>;
+
 export const ScamTypeSchema = z.enum([
   "FAMILY_IMPERSONATION",
   "AGENCY_IMPERSONATION",
+  "KAKAO_BRAND_IMPERSONATION",
   "DELIVERY_SMISHING",
+  "INVITATION_SMISHING",
+  "PUBLIC_NOTICE_SMISHING",
   "LOAN_SCAM",
   "INVESTMENT_ROOM",
   "SHOPPING_PREPAYMENT",
   "USED_MARKET_PREPAYMENT",
+  "GIFT_CARD_SCAM",
+  "ACCOUNT_TAKEOVER",
   "AUTH_CODE_REQUEST",
   "REMOTE_APP_INSTALL",
   "UNKNOWN_RISK",
@@ -33,6 +41,7 @@ export const MessageInputSchema = z.object({
 
 export const AnalyzeMessageInputSchema = MessageInputSchema.extend({
   userSituation: UserSituationSchema.optional().default("unknown"),
+  receivedVia: ReceivedViaSchema.optional().default("unknown"),
 });
 
 export const CheckUrlInputSchema = z.object({

@@ -84,7 +84,14 @@ export async function verifyBusinessRegistration(
     ? undefined
     : "사업자등록번호 검증식과 일치하지 않습니다. 입력 번호를 다시 확인하세요.";
   const apiKey = process.env.NTS_BUSINESS_API_KEY?.trim();
-  if (!apiKey) return fallback(number, checksumWarning);
+  const actualMode = process.env.PUBLIC_DATA_MODE?.trim().toLowerCase() === "actual";
+  if (!actualMode || !apiKey) {
+    const modeWarning = [
+      checksumWarning,
+      ...(actualMode && !apiKey ? ["PUBLIC_DATA_MODE=actual이지만 국세청 API 키가 없어 sample fallback을 사용합니다."] : []),
+    ].filter((warning): warning is string => warning !== undefined).join(" ") || undefined;
+    return fallback(number, modeWarning);
+  }
 
   try {
     const endpoint = new URL("https://api.odcloud.kr/api/nts-businessman/v1/status");

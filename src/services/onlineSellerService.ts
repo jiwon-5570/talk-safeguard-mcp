@@ -17,7 +17,7 @@ const sampleSellers = [
   { businessNumber: "1111111111", companyName: "휴업 데모상점", status: "휴업" },
 ];
 
-function fallback(businessNumber?: string, companyName?: string, apiFailed = false): OnlineSellerVerification {
+function fallback(businessNumber?: string, companyName?: string, fallbackWarning?: string): OnlineSellerVerification {
   const normalized = businessNumber === undefined ? undefined : normalizeBusinessNumber(businessNumber);
   const match = sampleSellers.find(
     (seller) => seller.businessNumber === normalized || (companyName !== undefined && seller.companyName.includes(companyName)),
@@ -27,7 +27,7 @@ function fallback(businessNumber?: string, companyName?: string, apiFailed = fal
     status: match?.status ?? "샘플에서 확인되지 않음",
     source: "공정거래위원회 통신판매사업자 데이터 형식 기반 sample fallback",
     warnings: [
-      ...(apiFailed ? ["공정거래위원회 API 호출에 실패하여 로컬 샘플로 대체했습니다."] : []),
+      ...(fallbackWarning === undefined ? [] : [fallbackWarning]),
       "현재 결과는 공모전 시연용 로컬 샘플이며 실시간 등록 조회 결과가 아닙니다.",
       "통신판매업 등록이 확인되어도 거래 위험 가능성이 0이 되거나 거래 안전이 보장되는 것은 아닙니다.",
     ],
@@ -55,7 +55,16 @@ export async function verifyOnlineSellerRegistration(
   companyName?: string,
 ): Promise<OnlineSellerVerification> {
   const apiKey = process.env.FTC_ONLINE_SELLER_API_KEY?.trim();
-  if (!apiKey) return fallback(businessRegistrationNumber, companyName);
+  const actualMode = process.env.PUBLIC_DATA_MODE?.trim().toLowerCase() === "actual";
+  if (!actualMode || !apiKey) {
+    return fallback(
+      businessRegistrationNumber,
+      companyName,
+      actualMode && !apiKey
+        ? "PUBLIC_DATA_MODE=actual이지만 공정거래위원회 API 키가 없어 sample fallback을 사용합니다."
+        : undefined,
+    );
+  }
 
   try {
     const byBusinessNumber = businessRegistrationNumber !== undefined;
@@ -83,6 +92,10 @@ export async function verifyOnlineSellerRegistration(
       safeAction: "조회된 상호·대표자·주소가 판매자가 제시한 정보와 같은지 확인하고 안전결제를 사용하세요.",
     };
   } catch {
-    return fallback(businessRegistrationNumber, companyName, true);
+    return fallback(
+      businessRegistrationNumber,
+      companyName,
+      "공정거래위원회 API 호출에 실패하여 로컬 샘플로 대체했습니다.",
+    );
   }
 }

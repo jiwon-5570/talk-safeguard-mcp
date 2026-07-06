@@ -8,7 +8,9 @@ COPY src ./src
 RUN npm run build
 
 FROM node:22-alpine AS production
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    ENABLE_DEBUG_ENDPOINT=false \
+    PUBLIC_DATA_MODE=sample
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force

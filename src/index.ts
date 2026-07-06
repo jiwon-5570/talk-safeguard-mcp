@@ -7,5 +7,5 @@ const port = Number.isFinite(parsedPort) ? parsedPort : 3000;
 const app = createHttpApp();
 
 app.listen(port, "0.0.0.0", () => {
-  logger.info("server_started", { port, mcpEndpoint: "/mcp" });
+  logger.info("server_started", { port, mcpEndpoint: "/mcp", infoEndpoint: "/mcp/info" });
 });

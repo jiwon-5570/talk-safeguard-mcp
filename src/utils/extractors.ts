@@ -14,6 +14,12 @@ interface ScamKeywords {
   authCode: string[];
   remoteApp: string[];
   sensitive: string[];
+  kakaoBrand: string[];
+  eventLure: string[];
+  invitation: string[];
+  publicNotice: string[];
+  giftCard: string[];
+  accountSecurity: string[];
 }
 
 export interface RiskIndicators {
@@ -90,6 +96,12 @@ export function extractRiskIndicators(message: string): RiskIndicators {
       ...scamKeywords.usedMarket,
       ...scamKeywords.authCode,
       ...scamKeywords.remoteApp,
+      ...scamKeywords.kakaoBrand,
+      ...scamKeywords.eventLure,
+      ...scamKeywords.invitation,
+      ...scamKeywords.publicNotice,
+      ...scamKeywords.giftCard,
+      ...scamKeywords.accountSecurity,
     ].filter((keyword) => message.toLocaleLowerCase("ko-KR").includes(keyword.toLocaleLowerCase("ko-KR"))),
   );
 

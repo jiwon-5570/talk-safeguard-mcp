@@ -18,5 +18,21 @@
   {
     "pattern": "gift-event",
     "description": "경품·이벤트를 가장한 링크 패턴"
+  },
+  {
+    "pattern": "kakao-pay-event",
+    "description": "카카오페이 이벤트를 가장한 링크 패턴"
+  },
+  {
+    "pattern": "kakaopay-cert",
+    "description": "카카오페이 인증을 가장한 링크 패턴"
+  },
+  {
+    "pattern": "obituary-check",
+    "description": "모바일 부고 확인을 가장한 링크 패턴"
+  },
+  {
+    "pattern": "gov24-check",
+    "description": "정부24 안내를 가장한 링크 패턴"
   }
 ]

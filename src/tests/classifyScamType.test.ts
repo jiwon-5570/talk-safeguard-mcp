@@ -8,6 +8,9 @@ describe("classify_scam_type", () => {
     ["택배 주소 오류입니다. http://delivery-check-kr.example.com 에서 입력하세요.", "DELIVERY_SMISHING"],
     ["VIP 리딩방 원금 보장, 해외거래소 가입 시 매일 수익", "INVESTMENT_ROOM"],
     ["카톡 주문만 가능, 개인계좌로 입금하면 배송", "SHOPPING_PREPAYMENT"],
+    ["편의점에서 구글 기프트카드 사서 핀번호 사진 보내줘", "GIFT_CARD_SCAM"],
+    ["계정 이용이 제한되었습니다. http://kakao-account.example.com 에서 비밀번호와 인증번호를 입력하세요.", "ACCOUNT_TAKEOVER"],
+    ["모바일 부고장입니다. http://obituary-check.example.com 에서 장례식장을 확인하세요.", "INVITATION_SMISHING"],
   ])("%s => %s", (message, expected) => {
     const result = classifyScamTypeTool({ message });
     expect([result.primaryType, ...result.subTypes]).toContain(expected);

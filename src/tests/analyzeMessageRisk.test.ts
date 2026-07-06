@@ -53,4 +53,61 @@ describe("analyze_message_risk", () => {
     expect(result.riskScore).toBeLessThan(30);
     expect(result.scamTypes).toEqual(["UNKNOWN_RISK"]);
   });
+
+  it("카카오페이 이벤트 사칭과 본인인증 링크를 HIGH 이상으로 판단한다", () => {
+    const result = analyzeMessageRiskTool({
+      message: "카카오페이 이벤트 당첨입니다. 아래 링크에서 본인인증하면 5만원 지급됩니다. http://kakao-pay-event.example.com",
+      userSituation: "before_click",
+    });
+
+    expect(["HIGH", "CRITICAL"]).toContain(result.riskLevel);
+    expect(result.scamTypes).toContain("KAKAO_BRAND_IMPERSONATION");
+    expect(result.prohibitedActions.join(" ")).toContain("링크");
+    expect(result.reasons.join(" ")).toContain("본인");
+  });
+
+  it("모바일 부고 링크를 HIGH 이상으로 판단한다", () => {
+    const result = analyzeMessageRiskTool({
+      message: "모바일 부고장입니다. 아래 링크에서 장례식장 위치를 확인하세요. http://obituary-check.example.com",
+      userSituation: "before_click",
+    });
+
+    expect(["HIGH", "CRITICAL"]).toContain(result.riskLevel);
+    expect(result.scamTypes).toContain("INVITATION_SMISHING");
+    expect(result.reasons.join(" ")).toContain("부고");
+  });
+
+  it("가족 사칭 상품권 핀번호 요구를 CRITICAL로 판단한다", () => {
+    const result = analyzeMessageRiskTool({
+      message: "엄마 나 폰 고장났어. 편의점에서 구글 기프트카드 30만원만 사서 핀번호 사진 보내줘. 전화는 안 돼.",
+      userSituation: "before_click",
+    });
+
+    expect(result.riskLevel).toBe("CRITICAL");
+    expect(result.scamTypes).toContain("GIFT_CARD_SCAM");
+    expect(result.recommendedActions.join(" ")).toMatch(/상품권|핀번호/);
+  });
+
+  it("계정 제한 해제를 가장한 비밀번호·인증번호 요구를 CRITICAL로 판단한다", () => {
+    const result = analyzeMessageRiskTool({
+      message: "카카오톡 계정 이용이 제한되었습니다. 아래 링크에서 비밀번호와 인증번호를 입력해 해제하세요. http://kakao-account.example.com",
+      userSituation: "before_click",
+    });
+
+    expect(result.riskLevel).toBe("CRITICAL");
+    expect(result.scamTypes).toContain("ACCOUNT_TAKEOVER");
+    expect(result.recommendedActions.join(" ")).toMatch(/비밀번호|인증번호/);
+  });
+
+  it.each([
+    "오늘 저녁 7시에 가족방에서 여행 일정 이야기하자.",
+    "택배 도착했어. 문 앞에 뒀대.",
+    "다음 주에 은행 가서 상담받자.",
+    "주식 공부 모임에서 경제 뉴스 같이 읽어보자.",
+    "카카오페이로 내가 밥값 보낼게.",
+    "청첩장 디자인 같이 골라줘.",
+  ])("정상 문장을 LOW로 유지한다: %s", (message) => {
+    const result = analyzeMessageRiskTool({ message });
+    expect(result.riskLevel).toBe("LOW");
+  });
 });

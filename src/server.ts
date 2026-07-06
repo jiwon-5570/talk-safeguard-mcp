@@ -1,6 +1,8 @@
+import { createHash, randomBytes } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express, { type NextFunction, type Request, type Response } from "express";
+import helmet from "helmet";
 import { analyzeMessageRiskTool } from "./mcp/tools/analyzeMessageRisk.js";
 import { checkInvestmentRoomRiskTool } from "./mcp/tools/checkInvestmentRoomRisk.js";
 import { checkPhishingUrlTool } from "./mcp/tools/checkPhishingUrl.js";
@@ -20,6 +22,10 @@ import {
 import { toToolResult } from "./mcp/responses.js";
 import { logger } from "./utils/logger.js";
 
+export const SERVICE_NAME = "talk-safeguard-mcp";
+export const SERVICE_VERSION = "1.0.0";
+export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지 위험 신호 분석 MCP";
+
 export const TOOL_NAMES = [
   "analyze_message_risk",
   "extract_risk_indicators",
@@ -32,7 +38,7 @@ export const TOOL_NAMES = [
 ] as const;
 
 export function createTalkSafeguardServer(): McpServer {
-  const server = new McpServer({ name: "talk-safeguard-mcp", version: "1.0.0" });
+  const server = new McpServer({ name: SERVICE_NAME, version: SERVICE_VERSION });
 
   server.registerTool(
     "analyze_message_risk",
@@ -119,27 +125,166 @@ function configuredOrigins(): Set<string> {
   );
 }
 
+function envPositiveInteger(name: string, fallback: number): number {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function envFlag(name: string, fallback: boolean): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (value === "true" || value === "1" || value === "yes") return true;
+  if (value === "false" || value === "0" || value === "no") return false;
+  return fallback;
+}
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+function createRateLimitMiddleware() {
+  const windowMs = envPositiveInteger("RATE_LIMIT_WINDOW_MS", 60_000);
+  const maxRequests = envPositiveInteger("RATE_LIMIT_MAX", 60);
+  const entries = new Map<string, RateLimitEntry>();
+  const salt = randomBytes(32).toString("hex");
+
+  return (request: Request, response: Response, next: NextFunction): void => {
+    if (request.path === "/health") {
+      next();
+      return;
+    }
+
+    const now = Date.now();
+    for (const [key, entry] of entries) {
+      if (entry.resetAt <= now) entries.delete(key);
+    }
+    const rawAddress = request.ip || request.socket.remoteAddress || "unknown";
+    const clientKey = createHash("sha256").update(salt).update(rawAddress).digest("hex");
+    const current = entries.get(clientKey);
+    const entry = current === undefined || current.resetAt <= now
+      ? { count: 1, resetAt: now + windowMs }
+      : { count: current.count + 1, resetAt: current.resetAt };
+    entries.set(clientKey, entry);
+
+    const remaining = Math.max(0, maxRequests - entry.count);
+    response.setHeader("RateLimit-Limit", maxRequests);
+    response.setHeader("RateLimit-Remaining", remaining);
+    response.setHeader("RateLimit-Reset", Math.ceil(entry.resetAt / 1_000));
+    if (entry.count > maxRequests) {
+      const retryAfterSec = Math.max(1, Math.ceil((entry.resetAt - now) / 1_000));
+      response.setHeader("Retry-After", retryAfterSec);
+      response.status(429).json({
+        error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        retryAfterSec,
+      });
+      return;
+    }
+    next();
+  };
+}
+
+function createCorsMiddleware(allowedOrigins: Set<string>, production: boolean) {
+  return (request: Request, response: Response, next: NextFunction): void => {
+    const origin = request.header("origin");
+    if (origin === undefined) {
+      next();
+      return;
+    }
+    const allowDevelopmentOrigin = !production && allowedOrigins.size === 0;
+    if (!allowDevelopmentOrigin && !allowedOrigins.has(origin)) {
+      response.status(403).json({ error: "허용되지 않은 Origin입니다." });
+      return;
+    }
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.append("Vary", "Origin");
+    response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type,Accept,Mcp-Session-Id,Last-Event-ID");
+    response.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id,RateLimit-Limit,RateLimit-Remaining,RateLimit-Reset");
+    if (request.method === "OPTIONS") {
+      response.sendStatus(204);
+      return;
+    }
+    next();
+  };
+}
+
 export function createHttpApp() {
   const app = express();
+  const production = process.env.NODE_ENV === "production";
+  const allowedOrigins = configuredOrigins();
+  if (production && allowedOrigins.size === 0) {
+    logger.warn("cors_allowlist_missing_in_production");
+  }
+  if (envFlag("TRUST_PROXY", false)) app.set("trust proxy", 1);
   app.disable("x-powered-by");
+  app.use(helmet());
   app.use(express.json({ limit: "64kb" }));
   app.use((_request: Request, response: Response, next: NextFunction) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
     next();
   });
-  app.use((request: Request, response: Response, next: NextFunction) => {
-    const allowed = configuredOrigins();
-    const origin = request.header("origin");
-    if (origin !== undefined && allowed.size > 0 && !allowed.has(origin)) {
-      response.status(403).json({ error: "허용되지 않은 Origin입니다." });
-      return;
-    }
-    next();
-  });
+  app.use(createCorsMiddleware(allowedOrigins, production));
+  app.use(createRateLimitMiddleware());
 
   app.get("/health", (_request, response) => {
-    response.json({ status: "ok", service: "talk-safeguard-mcp", tools: TOOL_NAMES.length });
+    response.json({
+      status: "ok",
+      service: SERVICE_NAME,
+      version: SERVICE_VERSION,
+      tools: TOOL_NAMES.length,
+      privacyMode: "no-message-storage",
+      messageLogging: false,
+      dataRetention: "none",
+      uptimeSec: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.get("/mcp/info", (_request, response) => {
+    response.json({
+      service: SERVICE_NAME,
+      version: SERVICE_VERSION,
+      description: SERVICE_DESCRIPTION,
+      tools: TOOL_NAMES,
+      privacyMode: "no-message-storage",
+      dataMode: {
+        phishing: process.env.PHISHING_DATA_MODE ?? "sample",
+        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "sample",
+        publicData: process.env.PUBLIC_DATA_MODE ?? "sample",
+        business: "api-or-fallback",
+        onlineSeller: "api-or-fallback",
+      },
+      safetyPolicy: "risk-signal-only-no-fraud-certification",
+    });
+  });
+
+  app.post("/debug/analyze", async (request, response) => {
+    if (!envFlag("ENABLE_DEBUG_ENDPOINT", !production)) {
+      response.status(404).json({ error: "요청한 endpoint를 찾을 수 없습니다." });
+      return;
+    }
+    try {
+      const input = AnalyzeMessageInputSchema.parse(request.body);
+      const analysis = analyzeMessageRiskTool(input);
+      const indicators = extractRiskIndicatorsTool({ message: input.message });
+      const classification = classifyScamTypeTool({ message: input.message });
+      const urlAnalysis = indicators.urls.map((url) => checkPhishingUrlTool({ url }));
+      const investmentAnalysis = /리딩방|원금\s*보장|수익\s*보장|해외\s*거래소|급등주|코인\s*선물/u.test(input.message)
+        ? checkInvestmentRoomRiskTool({ message: input.message })
+        : undefined;
+      response.json({
+        analysis,
+        indicators,
+        classification,
+        ...(urlAnalysis.length > 0 ? { urlAnalysis } : {}),
+        ...(investmentAnalysis === undefined ? {} : { investmentAnalysis }),
+        safetyMessage: analysis.safetyMessage,
+        disclaimer: analysis.disclaimer,
+      });
+    } catch {
+      response.status(400).json({ error: "요청 형식을 확인해 주세요." });
+    }
   });
 
   app.post("/mcp", async (request, response) => {
