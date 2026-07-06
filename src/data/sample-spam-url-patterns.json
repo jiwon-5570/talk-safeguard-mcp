@@ -1,0 +1,22 @@
+[
+  {
+    "pattern": "delivery-check",
+    "description": "택배 주소 확인을 가장한 링크 패턴"
+  },
+  {
+    "pattern": "address-update",
+    "description": "주소 갱신을 유도하는 링크 패턴"
+  },
+  {
+    "pattern": "security-app",
+    "description": "보안 앱 설치를 유도하는 링크 패턴"
+  },
+  {
+    "pattern": "account-verify",
+    "description": "계정 또는 금융정보 확인을 유도하는 링크 패턴"
+  },
+  {
+    "pattern": "gift-event",
+    "description": "경품·이벤트를 가장한 링크 패턴"
+  }
+]

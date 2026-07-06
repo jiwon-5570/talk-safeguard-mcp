@@ -1,0 +1,22 @@
+[
+  {
+    "url": "http://delivery-check-kr.example.com",
+    "source": "한국인터넷진흥원 피싱사이트 URL 형식 기반 데모 샘플",
+    "category": "DELIVERY_SMISHING"
+  },
+  {
+    "url": "https://kakao-security.example.net/login",
+    "source": "한국인터넷진흥원 피싱사이트 URL 형식 기반 데모 샘플",
+    "category": "AGENCY_IMPERSONATION"
+  },
+  {
+    "url": "http://naver-pay-check.example.org/verify",
+    "source": "한국인터넷진흥원 피싱사이트 URL 형식 기반 데모 샘플",
+    "category": "SHOPPING_PREPAYMENT"
+  },
+  {
+    "url": "https://fss-safe-app.example.com/install",
+    "source": "한국인터넷진흥원 피싱사이트 URL 형식 기반 데모 샘플",
+    "category": "REMOTE_APP_INSTALL"
+  }
+]

@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+coverage
+*.log
+src/tests
+README.md
+demo-prompts.md
+submission-summary.md
