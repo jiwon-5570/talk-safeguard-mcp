@@ -105,9 +105,9 @@ npm start
 | `NODE_ENV` | `development` | 실행 환경 |
 | `NTS_BUSINESS_API_KEY` | 빈 값 | 국세청 공공데이터 API 키 |
 | `FTC_ONLINE_SELLER_API_KEY` | 빈 값 | 공정위 공공데이터 API 키 |
-| `PHISHING_DATA_MODE` | `sample` | 피싱 데이터 모드(현재 MVP는 sample) |
-| `SPAM_URL_DATA_MODE` | `sample` | 스팸 URL 데이터 모드(현재 MVP는 sample) |
-| `PUBLIC_DATA_MODE` | `sample` | `actual`일 때만 국세청·공정위 API 호출, 실패 시 sample fallback |
+| `PHISHING_DATA_MODE` | `actual` | actual 모드에서는 로컬 샘플 피싱 목록 미사용, 휴리스틱/공식 도메인 검증 사용 |
+| `SPAM_URL_DATA_MODE` | `actual` | actual 모드에서는 공공데이터 공식 CSV 기반 불법 스팸 URL 데이터셋 사용 |
+| `PUBLIC_DATA_MODE` | `actual` | `actual`일 때 국세청·공정위 실제 API 호출, 실패 시 sample fallback 미사용 |
 | `LOG_LEVEL` | `info` | 서버 구조 로그 수준 |
 | `ENABLE_DEBUG_ENDPOINT` | `true` | `/debug/analyze` 활성화. 운영에서는 `false` 권장 |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | IP 해시 기준 요청 제한 시간 |
@@ -115,7 +115,9 @@ npm start
 | `TRUST_PROXY` | `false` | 신뢰할 수 있는 단일 reverse proxy 뒤에서만 `true` |
 | `ALLOWED_ORIGINS` | 빈 값 | 쉼표 구분 Origin. 개발에서는 허용, production에서 비어 있으면 교차 출처 요청 거부 |
 
-`PUBLIC_DATA_MODE=sample`에서는 API 키 유무와 관계없이 재현 가능한 로컬 sample fallback을 사용합니다. `PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출하며, 키가 없거나 호출에 실패하면 서버 전체 장애 없이 sample fallback으로 전환합니다. 응답의 `source`와 `warnings`에서 실제 조회인지 fallback인지 확인할 수 있습니다.
+`PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출합니다. actual 모드에서는 키가 없거나 API 호출에 실패해도 sample 데이터로 대체하지 않고, 응답의 `source`와 `warnings`에 실패 사유를 명확히 반환합니다. `PUBLIC_DATA_MODE=sample`은 테스트/데모 전용입니다.
+
+`SPAM_URL_DATA_MODE=actual`에서는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`)를 사용합니다. `PHISHING_DATA_MODE=actual`에서는 로컬 샘플 피싱 목록을 사용하지 않고 휴리스틱·공식 도메인 검증만 적용합니다. `sample-*` JSON은 테스트/데모 전용이며 운영 actual 모드에서는 사용하지 않습니다.
 
 ## 테스트와 검증
 

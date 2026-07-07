@@ -2,7 +2,7 @@ import type { CanProceed, RiskLevel } from "../mcp/schemas.js";
 import { loadJsonData } from "../utils/dataLoader.js";
 import { tryNormalizeUrl } from "../utils/normalizeUrl.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
-import { matchSpamUrlPatterns } from "./spamUrlService.js";
+import { getSpamUrlDataSource, matchSpamUrlPatterns } from "./spamUrlService.js";
 
 interface PhishingSample {
   url: string;
@@ -41,6 +41,7 @@ function isDomainOrSubdomain(hostname: string, allowed: string): boolean {
 }
 
 function knownSampleMatch(normalizedUrl: string): PhishingSample | undefined {
+  if (process.env.PHISHING_DATA_MODE?.trim().toLowerCase() !== "sample") return undefined;
   const target = new URL(normalizedUrl);
   return samples.find((sample) => {
     const normalizedSample = tryNormalizeUrl(sample.url);
@@ -111,7 +112,7 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
   const matchedDataSource = matchedSample !== undefined
     ? `sample-phishing-urls: ${matchedSample.source}`
     : spamSignals.length > 0
-      ? "sample-spam-url-patterns"
+      ? getSpamUrlDataSource()
       : "heuristic";
   const canOpen: CanProceed = riskLevel === "HIGH" || riskLevel === "CRITICAL"
     ? "NO"

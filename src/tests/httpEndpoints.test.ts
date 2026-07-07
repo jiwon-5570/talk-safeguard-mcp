@@ -48,7 +48,8 @@ describe("HTTP 운영 endpoint", () => {
     expect(body.primaryTool).toBe("check_kakao_message");
     expect(body.toolCount).toBe(9);
     expect(body.privacyMode).toBe("no-message-storage");
-    expect(body.dataMode["business"]).toBe("api-or-fallback");
+    expect(body.dataMode["business"]).toBe("actual-api-no-sample-fallback");
+    expect(body.dataMode["onlineSeller"]).toBe("actual-api-no-sample-fallback");
   });
 
   it("/debug/analyze가 종합·추출·분류·URL 분석을 묶어 반환한다", async () => {

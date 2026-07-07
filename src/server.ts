@@ -93,7 +93,7 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_business_info",
     {
       title: "사업자등록 상태 확인",
-      description: "국세청 API 또는 sample fallback으로 사업자등록 상태를 보조 확인합니다.",
+      description: "국세청 사업자등록정보 API로 사업자등록 상태를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다.",
       inputSchema: VerifyBusinessInputSchema,
     },
     async (input) => toToolResult(await verifyBusinessInfoTool(input)),
@@ -102,7 +102,7 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_online_seller",
     {
       title: "통신판매사업자 확인",
-      description: "공정거래위원회 API 또는 sample fallback으로 통신판매업 등록 여부를 보조 확인합니다.",
+      description: "공정거래위원회 통신판매사업자 등록상세 API로 통신판매업 등록 여부를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다.",
       inputSchema: VerifyOnlineSellerInputSchema,
     },
     async (input) => toToolResult(await verifyOnlineSellerTool(input)),
@@ -266,11 +266,11 @@ export function createHttpApp() {
       purpose: SERVICE_DESCRIPTION,
       privacyMode: "no-message-storage",
       dataMode: {
-        phishing: process.env.PHISHING_DATA_MODE ?? "sample",
-        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "sample",
-        publicData: process.env.PUBLIC_DATA_MODE ?? "sample",
-        business: "api-or-fallback",
-        onlineSeller: "api-or-fallback",
+        phishing: process.env.PHISHING_DATA_MODE ?? "actual",
+        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "actual",
+        publicData: process.env.PUBLIC_DATA_MODE ?? "actual",
+        business: "actual-api-no-sample-fallback",
+        onlineSeller: "actual-api-no-sample-fallback",
       },
       safetyPolicy: "risk-signal-only-no-fraud-certification",
     });

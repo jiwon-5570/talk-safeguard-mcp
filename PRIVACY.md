@@ -17,8 +17,8 @@ Rate limit은 요청 횟수 계산을 위해 원본 IP를 프로세스별 임의
 
 - `PUBLIC_DATA_MODE=sample`에서는 외부 공공데이터 API로 사용자 입력을 전송하지 않습니다.
 - `PUBLIC_DATA_MODE=actual`이고 `NTS_BUSINESS_API_KEY`가 설정되면 국세청 API에 정규화된 사업자등록번호 10자리만 전송합니다.
-- `PUBLIC_DATA_MODE=actual`이고 `FTC_ONLINE_SELLER_API_KEY`가 설정되면 공정위 API에 사업자등록번호 또는 상호명을 전송합니다.
+- `PUBLIC_DATA_MODE=actual`이고 `FTC_ONLINE_SELLER_API_KEY`가 설정되면 공정위 통신판매사업자 등록상세 API에 정규화된 사업자등록번호 10자리를 전송합니다.
 - 메시지 전체, 전화번호, 계좌번호, 인증번호는 사업자 조회 API로 전송하지 않습니다.
-- API 실패 시 sample fallback으로 전환하며 입력을 별도로 보관하지 않습니다.
+- actual 모드에서는 API 실패 시 sample fallback으로 전환하지 않으며 입력을 별도로 보관하지 않습니다.
 
 운영자는 reverse proxy, APM, 클라우드 액세스 로그가 요청 본문이나 query parameter를 수집하지 않도록 별도로 설정해야 합니다.

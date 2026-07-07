@@ -201,6 +201,7 @@ export function analyzeMessage(
     if (giftCardRequest && (phoneAvoidance || impersonation)) score = Math.max(score, 85);
     if (accountTakeover && authRequest) score = Math.max(score, 85);
     if (kakaoBrandImpersonation && indicators.urls.length > 0) score = Math.max(score, 70);
+    if (types.includes("DELIVERY_SMISHING") && indicators.urls.length > 0) score = Math.max(score, 65);
     if (invitationSmishing && indicators.urls.length > 0) score = Math.max(score, installRequest ? 85 : 65);
     if (publicNoticeSmishing && indicators.urls.length > 0) score = Math.max(score, 65);
     if (userSituation === "clicked_link") score = Math.max(score + 20, 60);

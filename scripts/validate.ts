@@ -18,6 +18,7 @@ const requiredFiles = [
   "src/server.ts",
   "src/data/sample-phishing-urls.json",
   "src/data/sample-spam-url-patterns.json",
+  "src/data/official-spam-urls.csv",
   "src/tests/httpEndpoints.test.ts",
   "src/tests/fraudDecisionUx.test.ts",
   "src/tests/checkKakaoMessage.test.ts",
