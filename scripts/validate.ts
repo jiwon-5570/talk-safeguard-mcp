@@ -156,6 +156,12 @@ try {
   if (registered.length !== 9 || expectedTools.some((name) => !registered.includes(name))) {
     throw new Error(`MCP tools/list 검증 실패: ${registered.join(", ")}`);
   }
+  for (const tool of listed.tools) {
+    if (tool.annotations === undefined) throw new Error(`MCP tool annotations 누락: ${tool.name}`);
+    if (!tool.description?.includes("톡세이프가드") || !tool.description.includes("talksafeguard")) {
+      throw new Error(`MCP tool description 서비스명 누락: ${tool.name}`);
+    }
+  }
 } finally {
   await client.close();
   await server.close();
