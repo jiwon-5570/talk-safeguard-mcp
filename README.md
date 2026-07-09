@@ -16,11 +16,23 @@
 - 이거 사기야?
 - 송금해도 돼?
 - 사업자번호가 있으면 믿어도 돼?
+- 이 쇼핑몰 믿어도 돼?
+- 인증번호 입력해도 돼?
+- 앱 설치해도 돼?
 - 이 투자방 들어가도 돼?
 - 이미 링크를 눌렀는데 어떻게 해?
+- 이미 돈을 보냈는데 어떻게 해?
 - 신고해야 하면 어떤 내용을 정리해야 해?
 
-톡세이프가드는 사기 확정 판정을 내리지 않습니다. 대신 위험 신호, 확인 체크리스트, 지금 하면 안 되는 행동, 다음 행동을 안내합니다.
+톡세이프가드는 사기 확정 판정을 내리지 않습니다. 대신 첫 줄 결론, 위험 신호, 확인 체크리스트, 지금 하면 안 되는 행동, 다음 행동, 공유용 요약을 안내합니다.
+
+대표 응답은 사용자가 바로 행동할 수 있도록 아래 순서로 읽으면 됩니다.
+
+1. `answerHeadline`: “누르지 마세요”, “송금하지 마세요” 같은 첫 줄 결론
+2. `simpleConclusion`: 왜 지금 멈춰야 하는지에 대한 짧은 설명
+3. `emergencyAction`: 이미 눌렀거나 보냈을 때 지금 해야 할 조치
+4. `officialCheckSteps`: 공식 앱·홈페이지·고객센터에서 확인하는 절차
+5. `shareSummary`: 가족이나 지인에게 그대로 공유할 수 있는 짧은 요약
 
 ## 문제 정의
 
@@ -56,7 +68,7 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 
 처음 사용하는 클라이언트는 `check_kakao_message`를 호출하면 됩니다. 세부 URL·사업자·통신판매업·투자 분석이 필요할 때 나머지 전문 도구를 이어서 사용할 수 있습니다.
 
-`analyze_message_risk`의 핵심 응답은 `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
+`analyze_message_risk`와 대표 `check_kakao_message`의 핵심 응답은 `answerHeadline`, `simpleConclusion`, `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `shareSummary`, `emergencyAction`, `officialCheckSteps`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
 
 ## 활용 공공데이터 5개
 

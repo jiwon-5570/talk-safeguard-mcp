@@ -17,6 +17,10 @@ describe("check_kakao_message", () => {
 
     expect(result.canProceed).toBe("NO");
     expect(["SUSPICIOUS", "HIGHLY_SUSPICIOUS"]).toContain(result.verdict);
+    expect(result.answerHeadline).toBe("결론: 링크를 누르지 마세요.");
+    expect(result.shareSummary).toContain("공유용 요약");
+    expect(result.emergencyAction).toContain("지금 할 일");
+    expect(result.officialCheckSteps.join(" ")).toContain("공식");
     expect(result.userQuestionAnswer).toContain("누르지 않는 것이 안전");
     expect(result.verificationChecklist.join(" ")).toMatch(/공식 앱|공식 홈페이지/);
     expect(result.relatedChecks.hasUrl).toBe(true);

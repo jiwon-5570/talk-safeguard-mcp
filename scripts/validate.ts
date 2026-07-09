@@ -93,6 +93,23 @@ if (!responseSource.includes("safetyMessage") || !responseSource.includes("discl
   throw new Error("공통 안전 고지 필드 구현을 찾을 수 없습니다.");
 }
 
+const decisionUxFields = [
+  "answerHeadline",
+  "simpleConclusion",
+  "decisionSummary",
+  "verdict",
+  "canProceed",
+  "userQuestionAnswer",
+  "shareSummary",
+  "emergencyAction",
+  "officialCheckSteps",
+  "publicDataSources",
+  "verificationChecklist",
+  "evidenceSummary",
+  "nextStepGuide",
+  "incidentReportSummary",
+];
+
 const decisionSources = await Promise.all([
   "src/mcp/schemas.ts",
   "src/services/decisionService.ts",
@@ -100,16 +117,7 @@ const decisionSources = await Promise.all([
   "src/services/riskRuleEngine.ts",
 ].map((file) => readFile(resolve(process.cwd(), file), "utf8")));
 const combinedDecisionSource = decisionSources.join("\n");
-for (const field of [
-  "decisionSummary",
-  "verdict",
-  "canProceed",
-  "userQuestionAnswer",
-  "verificationChecklist",
-  "evidenceSummary",
-  "nextStepGuide",
-  "incidentReportSummary",
-]) {
+for (const field of decisionUxFields) {
   if (!combinedDecisionSource.includes(field)) throw new Error(`사기 확인 UX 필드 구현 누락: ${field}`);
 }
 if (!combinedDecisionSource.includes("VerdictSchema") || !combinedDecisionSource.includes("CanProceedSchema")) {
@@ -168,5 +176,5 @@ try {
 }
 
 console.log(
-  `필수 파일 ${requiredFiles.length}개, 판단 UX 필드 8개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, 대표 도구 포함 MCP tools/list 도구 ${TOOL_NAMES.length}개, 문서 방향·버전·원문 로그 금지 패턴 확인 완료`,
+  `필수 파일 ${requiredFiles.length}개, 판단 UX 필드 ${decisionUxFields.length}개, endpoint 4개, 환경변수 ${requiredEnvVars.length}개, 대표 도구 포함 MCP tools/list 도구 ${TOOL_NAMES.length}개, 문서 방향·버전·원문 로그 금지 패턴 확인 완료`,
 );

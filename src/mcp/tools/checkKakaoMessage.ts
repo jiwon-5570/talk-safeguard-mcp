@@ -10,10 +10,16 @@ export function checkKakaoMessageTool(input: unknown) {
   const incident = ["sent_money", "installed_app", "shared_info"].includes(userSituation);
   return withSafety(
     {
+      answerHeadline: analysis.answerHeadline,
+      simpleConclusion: analysis.simpleConclusion,
       decisionSummary: analysis.decisionSummary,
       verdict: analysis.verdict,
       canProceed: analysis.canProceed,
       userQuestionAnswer: analysis.userQuestionAnswer,
+      shareSummary: analysis.shareSummary,
+      emergencyAction: analysis.emergencyAction,
+      officialCheckSteps: analysis.officialCheckSteps,
+      publicDataSources: analysis.publicDataSources,
       riskScore: analysis.riskScore,
       riskLevel: analysis.riskLevel,
       scamTypes: analysis.scamTypes,
