@@ -20,6 +20,7 @@ export interface FraudDecision {
   emergencyAction: string;
   officialCheckSteps: string[];
   publicDataSources: string[];
+  inputWarnings: string[];
   evidenceSummary: string[];
   verificationChecklist: string[];
   doNotActions: string[];
@@ -68,6 +69,7 @@ function determineVerdict(input: FraudDecisionInput, intent: UserQuestionIntent)
     return "URGENT_ACTION";
   }
   if (input.userSituation === "clicked_link" || intent === "ASK_AFTER_CLICK") return "SUSPICIOUS";
+  if (intent === "ASK_OPEN_LINK" && input.indicators.urls.length === 0) return "INSUFFICIENT_INFO";
   if (input.message.trim().length < 8 && input.reasons.length === 0) return "INSUFFICIENT_INFO";
   const decisiveType = input.scamTypes.some((type) => decisiveRiskTypes.has(type));
   if (input.riskLevel === "CRITICAL" || (input.riskLevel === "HIGH" && decisiveType)) {
@@ -131,6 +133,7 @@ function decisionSummary(input: FraudDecisionInput, verdict: Verdict): string {
 
 function answerHeadline(intent: UserQuestionIntent, verdict: Verdict, canProceed: CanProceed): string {
   if (verdict === "URGENT_ACTION") return "결론: 추가 행동을 멈추고 피해 대응을 시작하세요.";
+  if (verdict === "INSUFFICIENT_INFO") return "결론: 실제 URL이나 메시지 원문 없이는 판단할 수 없습니다.";
   if (intent === "ASK_OPEN_LINK") return canProceed === "NO" ? "결론: 링크를 누르지 마세요." : "결론: 공식 경로로 먼저 확인하세요.";
   if (intent === "ASK_SEND_MONEY") return canProceed === "NO" ? "결론: 송금하지 마세요." : "결론: 바로 송금하지 말고 먼저 확인하세요.";
   if (intent === "ASK_TRUST_SELLER") return "결론: 사업자번호만으로 믿지 마세요.";
@@ -210,6 +213,17 @@ function buildPublicDataSources(input: FraudDecisionInput): string[] {
   return unique(sources);
 }
 
+function buildInputWarnings(input: FraudDecisionInput, intent: UserQuestionIntent): string[] {
+  const warnings: string[] = [];
+  if (intent === "ASK_OPEN_LINK" && input.indicators.urls.length === 0) {
+    warnings.push("링크를 언급했지만 실제 URL 문자열이 없어 URL 검사를 수행하지 못했습니다.");
+  }
+  if (input.message.trim().length < 8) {
+    warnings.push("메시지 원문이 너무 짧아 사기 여부를 판단할 근거가 부족합니다.");
+  }
+  return warnings;
+}
+
 function emergencyAction(input: FraudDecisionInput, intent: UserQuestionIntent, canProceed: CanProceed): string {
   if (input.userSituation === "sent_money" || intent === "ASK_AFTER_SENT_MONEY") {
     return "지금 할 일: 추가 송금을 멈추고 은행 고객센터에 지급정지 가능 여부를 문의한 뒤 경찰 112 또는 금융감독원 1332 안내를 확인하세요.";
@@ -222,6 +236,9 @@ function emergencyAction(input: FraudDecisionInput, intent: UserQuestionIntent, 
   }
   if (input.userSituation === "clicked_link" || intent === "ASK_AFTER_CLICK") {
     return "지금 할 일: 페이지를 닫고 개인정보 입력·파일 다운로드·앱 설치를 중단하세요. 비밀번호나 인증번호를 입력했다면 즉시 변경·차단 절차를 진행하세요.";
+  }
+  if (intent === "ASK_OPEN_LINK" && input.indicators.urls.length === 0) {
+    return "지금 할 일: 실제 URL 전체나 메시지 원문을 입력해 다시 검사하세요. URL을 확인하기 전에는 누르지 마세요.";
   }
   if (canProceed === "NO") {
     return "지금 할 일: 링크 클릭, 송금, 앱 설치, 인증번호 입력을 모두 중단하고 공식 앱·홈페이지·고객센터에서 직접 확인하세요.";
@@ -247,6 +264,7 @@ function answerUserQuestion(
   input: FraudDecisionInput,
   intent: UserQuestionIntent,
   canProceed: CanProceed,
+  verdict: Verdict,
   summary: string,
 ): string {
   if (input.userSituation === "sent_money" || intent === "ASK_AFTER_SENT_MONEY") {
@@ -260,6 +278,9 @@ function answerUserQuestion(
   }
   if (input.userSituation === "clicked_link" || intent === "ASK_AFTER_CLICK") {
     return "이미 링크를 눌렀다면 페이지를 닫고 개인정보 입력과 파일 다운로드를 중단하세요. 설치된 앱·프로필이 없는지 확인하고 비밀번호나 인증번호를 입력하지 마세요.";
+  }
+  if (verdict === "INSUFFICIENT_INFO") {
+    return "실제 URL이나 메시지 원문이 없어 URL 안전성을 테스트할 수 없습니다. 링크 전체, 보낸 사람, 요구 행동을 입력한 뒤 다시 확인하세요. 확인 전에는 링크를 누르지 마세요.";
   }
   if (intent === "ASK_TRUST_SELLER") {
     return "사업자번호가 있어도 거래 안전이 보장되지는 않습니다. 사업자 상태와 통신판매사업자 등록 여부를 확인하고, 개인계좌 선입금이나 안전결제 거부가 있으면 결제하지 않는 것이 안전합니다.";
@@ -310,11 +331,12 @@ export function buildFraudDecision(input: FraudDecisionInput): FraudDecision {
     decisionSummary: summary,
     verdict,
     canProceed,
-    userQuestionAnswer: answerUserQuestion(input, intent, canProceed, summary),
+    userQuestionAnswer: answerUserQuestion(input, intent, canProceed, verdict, summary),
     shareSummary: shareSummary(input, headline, canProceed),
     emergencyAction: emergencyAction(input, intent, canProceed),
     officialCheckSteps: buildOfficialCheckSteps(input),
     publicDataSources: buildPublicDataSources(input),
+    inputWarnings: buildInputWarnings(input, intent),
     evidenceSummary,
     verificationChecklist: buildVerificationChecklist(input),
     doNotActions: [...input.doNotActions],

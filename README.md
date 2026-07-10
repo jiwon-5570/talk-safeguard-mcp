@@ -34,6 +34,8 @@
 4. `officialCheckSteps`: 공식 앱·홈페이지·고객센터에서 확인하는 절차
 5. `shareSummary`: 가족이나 지인에게 그대로 공유할 수 있는 짧은 요약
 
+실제 URL 문자열이 입력되지 않고 “링크가 왔다”는 설명만 있는 경우에는 URL 검사를 완료한 것처럼 응답하지 않습니다. 이때는 `INSUFFICIENT_INFO`, `inputWarnings`, 빈 `urlChecks`를 반환하고 실제 URL 또는 메시지 원문을 다시 요청합니다.
+
 ## 문제 정의
 
 카카오톡에는 가족 대화, 오픈채팅, 쇼핑, 공동구매, 중고거래, 투자 정보가 한곳에 모입니다. 공격자는 이 신뢰 관계를 이용해 가족·기관 사칭, 택배 스미싱, 투자 리딩방, 개인계좌 선입금, 인증번호 요구, 원격제어 앱 설치를 유도합니다. 특히 긴급성과 권위를 함께 내세우면 사용자가 링크를 누르거나 송금한 뒤에야 위험을 알아차리기 쉽습니다.
@@ -43,7 +45,7 @@
 ## 해결 방법
 
 1. 메시지에서 URL, 금액, 긴급 표현, 사칭 표현, 사업자등록번호, 전화·계좌번호 후보를 메모리에서 일시 추출합니다.
-2. 피싱·불법 스팸 URL 샘플과 도메인 휴리스틱을 적용합니다.
+2. 추출된 실제 URL을 정규화하고 공식 스팸 URL 데이터셋·도메인 휴리스틱으로 검사합니다.
 3. 명시된 가중치와 위험 조합으로 0~100점 및 `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` 등급을 계산합니다.
 4. 가족 사칭, 기관 사칭, 배송 스미싱, 대출, 투자 리딩방, 쇼핑·중고 선입금, 인증번호, 원격 앱 설치 유형을 분류합니다.
 5. 질문에 대한 직접 답변, 진행 가능 여부, 확인 체크리스트, 금지 행동, 다음 행동과 상담·신고 요약문을 생성합니다.
@@ -68,19 +70,19 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 
 처음 사용하는 클라이언트는 `check_kakao_message`를 호출하면 됩니다. 세부 URL·사업자·통신판매업·투자 분석이 필요할 때 나머지 전문 도구를 이어서 사용할 수 있습니다.
 
-`analyze_message_risk`와 대표 `check_kakao_message`의 핵심 응답은 `answerHeadline`, `simpleConclusion`, `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `shareSummary`, `emergencyAction`, `officialCheckSteps`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
+`analyze_message_risk`와 대표 `check_kakao_message`의 핵심 응답은 `answerHeadline`, `simpleConclusion`, `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `shareSummary`, `emergencyAction`, `officialCheckSteps`, `inputWarnings`, `urlChecks`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
 
 ## 활용 공공데이터 5개
 
 | 데이터 | MVP 활용 |
 |---|---|
-| [한국인터넷진흥원_피싱사이트 URL](https://www.data.go.kr/data/15109780/fileData.do) | 로컬 샘플 및 피싱 URL 패턴 점검 |
+| [한국인터넷진흥원_피싱사이트 URL](https://www.data.go.kr/data/15109780/fileData.do) | 피싱 URL 데이터 구조 참고 및 공식 도메인·URL 휴리스틱 설계 |
 | [통신 빅데이터플랫폼_불법 스팸 URL 데이터셋](https://www.data.go.kr/data/15134609/fileData.do) | `hxxp`, 스미싱 URL 패턴 및 단축 URL 규칙 |
 | [경찰청_보이스피싱 현황](https://www.data.go.kr/data/15063815/fileData.do) | 문제 근거 및 기관사칭·대출사기·메신저피싱 분류 참고 |
 | [국세청_사업자등록정보 진위확인 및 상태조회](https://www.data.go.kr/data/15081808/openapi.do) | 사업자 운영 상태 실시간 보조 조회 |
 | [공정거래위원회_통신판매사업자 등록상세](https://www.data.go.kr/data/15126315/openapi.do) | 온라인 판매자 신고·영업 상태 보조 조회 |
 
-샘플 JSON은 원본 공공데이터 전체를 재배포하지 않으며, 데이터 형식과 위험 패턴을 설명하기 위한 데모 레코드입니다. 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
+테스트 fixture JSON은 원본 공공데이터 전체를 재배포하지 않으며, 자동 테스트에서만 데이터 형식을 검증하기 위한 레코드입니다. 운영 actual 모드의 판단 결과에는 테스트 fixture를 섞지 않습니다. 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
 
 ## 설치 및 실행
 

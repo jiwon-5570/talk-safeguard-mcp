@@ -3,6 +3,7 @@ import { extractRiskIndicators, scamKeywords, type RiskIndicators } from "../uti
 import { processEphemeral } from "../utils/privacy.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
 import { analyzePhishingUrl } from "./phishingUrlService.js";
+import type { PhishingUrlAnalysis } from "./phishingUrlService.js";
 import { buildFraudDecision, type FraudDecision } from "./decisionService.js";
 import { generateSafetyGuide, scamTypeLabel } from "./safetyGuideService.js";
 
@@ -18,6 +19,7 @@ export interface MessageRiskAnalysis extends FraudDecision {
   riskScore: number;
   riskLevel: RiskLevel;
   scamTypes: ScamType[];
+  urlChecks: PhishingUrlAnalysis[];
   reasons: string[];
   prohibitedActions: string[];
   recommendedActions: string[];
@@ -173,7 +175,7 @@ export function analyzeMessage(
 
     let score = 0;
     score += addReason(reasons, indicators.urls.length > 0, "메시지에 외부 URL이 포함되어 있습니다.", 10);
-    score += addReason(reasons, urlRisk.some((risk) => risk.riskLevel !== "LOW"), "URL에서 알려진 샘플 또는 의심 도메인 신호가 감지되었습니다.", 15);
+    score += addReason(reasons, urlRisk.some((risk) => risk.riskLevel !== "LOW"), "URL에서 공식 데이터 또는 의심 도메인 신호가 감지되었습니다.", 15);
     score += addReason(reasons, transferRequest, "송금·입금 요구 표현이 포함되어 있습니다.", 25);
     score += addReason(reasons, indicators.bankAccountCandidates.length > 0, "계좌번호로 보이는 숫자열이 포함되어 있습니다.", 20);
     score += addReason(reasons, phoneAvoidance, "기존 전화 확인을 피하게 하는 표현이 포함되어 있습니다.", 20);
@@ -235,6 +237,7 @@ export function analyzeMessage(
       riskScore,
       riskLevel,
       scamTypes: classification.primaryType === "UNKNOWN_RISK" ? ["UNKNOWN_RISK"] : types,
+      urlChecks: urlRisk,
       reasons,
       prohibitedActions: guide.doNotActions,
       recommendedActions: [...guide.immediateActions, ...guide.reportGuide],

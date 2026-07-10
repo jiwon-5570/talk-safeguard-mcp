@@ -21,6 +21,9 @@ describe("check_kakao_message", () => {
     expect(result.shareSummary).toContain("공유용 요약");
     expect(result.emergencyAction).toContain("지금 할 일");
     expect(result.officialCheckSteps.join(" ")).toContain("공식");
+    expect(result.inputWarnings).toHaveLength(0);
+    expect(result.urlChecks.length).toBeGreaterThan(0);
+    expect(result.urlChecks[0]?.normalizedUrl).toContain("kakao-pay-event.example.com");
     expect(result.userQuestionAnswer).toContain("누르지 않는 것이 안전");
     expect(result.verificationChecklist.join(" ")).toMatch(/공식 앱|공식 홈페이지/);
     expect(result.relatedChecks.hasUrl).toBe(true);
@@ -87,5 +90,20 @@ describe("check_kakao_message", () => {
     expect(["URGENT_ACTION", "SUSPICIOUS"]).toContain(result.verdict);
     expect(result.canProceed).toBe("NO");
     expect(result.nextStepGuide.join(" ")).toMatch(/추가.*입력.*중단/);
+  });
+
+  it("실제 URL 없이 링크만 언급하면 URL 검사를 완료한 것처럼 답하지 않는다", () => {
+    const result = checkKakaoMessageTool({
+      message: "카카오페이 이벤트 당첨이라며 링크가 왔어.",
+      question: "이 링크 눌러도 돼?",
+      userSituation: "before_click",
+    });
+
+    expect(result.verdict).toBe("INSUFFICIENT_INFO");
+    expect(result.canProceed).toBe("CHECK_FIRST");
+    expect(result.answerHeadline).toContain("실제 URL");
+    expect(result.inputWarnings.join(" ")).toContain("실제 URL 문자열이 없어");
+    expect(result.urlChecks).toHaveLength(0);
+    expect(result.userQuestionAnswer).toContain("URL 안전성을 테스트할 수 없습니다");
   });
 });

@@ -104,6 +104,8 @@ const decisionUxFields = [
   "emergencyAction",
   "officialCheckSteps",
   "publicDataSources",
+  "inputWarnings",
+  "urlChecks",
   "verificationChecklist",
   "evidenceSummary",
   "nextStepGuide",

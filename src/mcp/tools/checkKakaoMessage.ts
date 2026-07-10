@@ -20,6 +20,8 @@ export function checkKakaoMessageTool(input: unknown) {
       emergencyAction: analysis.emergencyAction,
       officialCheckSteps: analysis.officialCheckSteps,
       publicDataSources: analysis.publicDataSources,
+      inputWarnings: analysis.inputWarnings,
+      urlChecks: analysis.urlChecks,
       riskScore: analysis.riskScore,
       riskLevel: analysis.riskLevel,
       scamTypes: analysis.scamTypes,
