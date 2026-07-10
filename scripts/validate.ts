@@ -16,8 +16,6 @@ const requiredFiles = [
   ".dockerignore",
   "src/index.ts",
   "src/server.ts",
-  "src/data/sample-phishing-urls.json",
-  "src/data/sample-spam-url-patterns.json",
   "src/data/official-spam-urls.csv",
   "src/tests/httpEndpoints.test.ts",
   "src/tests/fraudDecisionUx.test.ts",
@@ -59,9 +57,6 @@ const requiredEnvVars = [
   "ALLOWED_ORIGINS",
   "NTS_BUSINESS_API_KEY",
   "FTC_ONLINE_SELLER_API_KEY",
-  "PHISHING_DATA_MODE",
-  "SPAM_URL_DATA_MODE",
-  "PUBLIC_DATA_MODE",
 ];
 
 async function collectTypeScriptFiles(directory: string): Promise<string[]> {
@@ -132,7 +127,7 @@ if ((readme.match(/가족방 공유/gu) ?? []).length > 1) {
   throw new Error("README에서 가족방 공유가 핵심 기능처럼 반복되고 있습니다.");
 }
 const demoPrompts = await readFile(resolve(process.cwd(), "demo-prompts.md"), "utf8");
-if (!demoPrompts.includes("실제 사용자 질문형 데모")) throw new Error("demo-prompts 실제 사용자 질문형 데모가 누락되었습니다.");
+if (!demoPrompts.includes("실제 사용자 질문형 예시")) throw new Error("demo-prompts 실제 사용자 질문형 예시가 누락되었습니다.");
 
 const packageJson = JSON.parse(await readFile(resolve(process.cwd(), "package.json"), "utf8")) as { version?: string };
 if (packageJson.version !== "1.1.0" || !serverSource.includes('SERVICE_VERSION = "1.1.0"')) {
@@ -153,6 +148,29 @@ const directMessageLogPattern = /(?:logger\.(?:debug|info|warn|error)|console\.(
 for (const sourceFile of sourceFiles) {
   const source = await readFile(sourceFile, "utf8");
   if (directMessageLogPattern.test(source)) throw new Error(`메시지 원문 직접 로그 가능성 발견: ${sourceFile}`);
+}
+
+const runtimeOnlyActualSource = await Promise.all([
+  "src/services/businessRegistryService.ts",
+  "src/services/onlineSellerService.ts",
+  "src/services/phishingUrlService.ts",
+  "src/services/spamUrlService.ts",
+  "src/server.ts",
+  "scripts/copy-data.mjs",
+].map((file) => readFile(resolve(process.cwd(), file), "utf8")));
+const disallowedRuntimePatterns = [
+  "sampleFallback",
+  "PUBLIC_DATA_MODE",
+  "PHISHING_DATA_MODE",
+  "SPAM_URL_DATA_MODE",
+  "sample-phishing-urls",
+  "sample-spam-url-patterns",
+  "로컬 피싱 URL 데모",
+];
+for (const pattern of disallowedRuntimePatterns) {
+  if (runtimeOnlyActualSource.some((source) => source.includes(pattern))) {
+    throw new Error(`운영 런타임에 테스트용 데이터 모드 의존성이 남아 있습니다: ${pattern}`);
+  }
 }
 
 const server = createTalkSafeguardServer();

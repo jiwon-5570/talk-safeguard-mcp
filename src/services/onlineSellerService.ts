@@ -20,11 +20,6 @@ interface UnknownRecord {
   [key: string]: unknown;
 }
 
-const sampleSellers = [
-  { businessNumber: "1234567890", companyName: "톡세이프 데모상점", status: "정상영업" },
-  { businessNumber: "1111111111", companyName: "폐업 데모상점", status: "폐업" },
-];
-
 function withSellerDecision(value: OnlineSellerVerificationBase): OnlineSellerVerification {
   const inactive = /휴업|폐업|취소|말소|영업정지|정지/u.test(value.status);
   return {
@@ -45,24 +40,6 @@ function withSellerDecision(value: OnlineSellerVerificationBase): OnlineSellerVe
       "카톡 주문만 가능하거나 외부 결제를 유도하면 결제를 중단하세요.",
     ],
   };
-}
-
-function sampleFallback(businessNumber?: string, companyName?: string, fallbackWarning?: string): OnlineSellerVerification {
-  const normalized = businessNumber === undefined ? undefined : normalizeBusinessNumber(businessNumber);
-  const match = sampleSellers.find(
-    (seller) => seller.businessNumber === normalized || (companyName !== undefined && seller.companyName.includes(companyName)),
-  );
-  return withSellerDecision({
-    registered: match === undefined ? null : true,
-    status: match?.status ?? "샘플에서 확인되지 않음",
-    source: "공정거래위원회 통신판매사업자 데이터 형식 기반 sample fallback",
-    warnings: [
-      ...(fallbackWarning === undefined ? [] : [fallbackWarning]),
-      "현재 결과는 PUBLIC_DATA_MODE=sample에서만 사용하는 로컬 샘플이며 실시간 공정위 조회 결과가 아닙니다.",
-      "실제 운영에서는 PUBLIC_DATA_MODE=actual과 API 키를 설정해 공공데이터 API만 사용하세요.",
-    ],
-    safeAction: "운영 환경에서는 실제 공정위 API 조회가 성공한 뒤에만 참고하세요.",
-  });
 }
 
 function actualUnavailable(warnings: string[]): OnlineSellerVerification {
@@ -103,8 +80,8 @@ function decodeApiKey(value: string): string {
   }
 }
 
-function stringifyStatus(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+function stringifyStatus(value: unknown, defaultValue: string): string {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : defaultValue;
 }
 
 export async function verifyOnlineSellerRegistration(
@@ -112,11 +89,8 @@ export async function verifyOnlineSellerRegistration(
   companyName?: string,
 ): Promise<OnlineSellerVerification> {
   const apiKey = process.env.FTC_ONLINE_SELLER_API_KEY?.trim();
-  const publicDataMode = process.env.PUBLIC_DATA_MODE?.trim().toLowerCase() ?? "actual";
-  const actualMode = publicDataMode === "actual";
-  if (!actualMode) return sampleFallback(businessRegistrationNumber, companyName);
   if (!apiKey) {
-    return actualUnavailable(["PUBLIC_DATA_MODE=actual이지만 FTC_ONLINE_SELLER_API_KEY가 설정되지 않았습니다."]);
+    return actualUnavailable(["FTC_ONLINE_SELLER_API_KEY가 설정되지 않아 실제 공정위 API 조회를 수행하지 못했습니다."]);
   }
   if (businessRegistrationNumber === undefined) {
     return actualUnavailable([
@@ -161,7 +135,7 @@ export async function verifyOnlineSellerRegistration(
   } catch (error) {
     return actualUnavailable([
       `공정위 등록상세 API 호출에 실패했습니다: ${error instanceof Error ? error.message : "UNKNOWN_ERROR"}`,
-      "actual 모드에서는 API 실패 시 sample 데이터로 대체하지 않습니다.",
+      "API 실패 시 대체 데이터로 결과를 꾸미지 않습니다.",
     ]);
   }
 }

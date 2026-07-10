@@ -25,11 +25,6 @@ interface NtsResponse {
   data?: NtsStatusItem[];
 }
 
-const sampleBusinesses: Record<string, Exclude<BusinessStatus, "API_NOT_CONFIGURED">> = {
-  "1234567890": "ACTIVE",
-  "0000000000": "CLOSED",
-};
-
 export function normalizeBusinessNumber(value: string): string {
   return value.replace(/\D/gu, "");
 }
@@ -84,21 +79,6 @@ function withBusinessDecision(value: BusinessVerificationBase): BusinessVerifica
   };
 }
 
-function sampleFallback(number: string, warning?: string): BusinessVerification {
-  const configuredStatus = sampleBusinesses[number];
-  const warnings = [
-    ...(warning === undefined ? [] : [warning]),
-    "현재 결과는 PUBLIC_DATA_MODE=sample에서만 사용하는 로컬 샘플이며 실시간 국세청 조회 결과가 아닙니다.",
-    "실제 운영에서는 PUBLIC_DATA_MODE=actual과 API 키를 설정해 공공데이터 API만 사용하세요.",
-  ];
-  return withBusinessDecision({
-    status: configuredStatus ?? "API_NOT_CONFIGURED",
-    source: "국세청 사업자등록정보 형식 기반 sample fallback",
-    warnings,
-    safeAction: "운영 환경에서는 실제 국세청 API 조회가 성공한 뒤에만 참고하세요.",
-  });
-}
-
 function actualUnavailable(status: BusinessStatus, source: string, warnings: string[]): BusinessVerification {
   return withBusinessDecision({
     status,
@@ -127,14 +107,11 @@ export async function verifyBusinessRegistration(
     ? undefined
     : "사업자등록번호가 검증식과 일치하지 않습니다. 입력 번호를 다시 확인하세요.";
   const apiKey = process.env.NTS_BUSINESS_API_KEY?.trim();
-  const publicDataMode = process.env.PUBLIC_DATA_MODE?.trim().toLowerCase() ?? "actual";
-  const actualMode = publicDataMode === "actual";
 
-  if (!actualMode) return sampleFallback(number, checksumWarning);
   if (!apiKey) {
     return actualUnavailable("API_NOT_CONFIGURED", "국세청 API 미설정", [
       ...(checksumWarning === undefined ? [] : [checksumWarning]),
-      "PUBLIC_DATA_MODE=actual이지만 NTS_BUSINESS_API_KEY가 설정되지 않았습니다.",
+      "NTS_BUSINESS_API_KEY가 설정되지 않아 실제 국세청 API 조회를 수행하지 못했습니다.",
     ]);
   }
 
@@ -163,7 +140,7 @@ export async function verifyBusinessRegistration(
     return actualUnavailable("UNKNOWN", "국세청 사업자등록정보 진위확인 및 상태조회 API", [
       ...(checksumWarning === undefined ? [] : [checksumWarning]),
       `국세청 API 호출에 실패했습니다: ${error instanceof Error ? error.message : "UNKNOWN_ERROR"}`,
-      "actual 모드에서는 API 실패 시 sample 데이터로 대체하지 않습니다.",
+      "API 실패 시 대체 데이터로 결과를 꾸미지 않습니다.",
     ]);
   }
 }

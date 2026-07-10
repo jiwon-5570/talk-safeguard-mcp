@@ -29,13 +29,13 @@ flowchart LR
 
 ## URL 분석 흐름
 
-URL은 `hxxp` 변형을 복원하고 hostname을 정규화한 뒤 sample 피싱 URL, sample 스팸 패턴, 단축 URL, IP 직접 접속, punycode, 과도한 하이픈·숫자, 브랜드 유사 도메인, 인증·이벤트 path를 점수화합니다. 응답은 정규화 URL, 도메인, 점수, 등급, 데이터 출처와 사람이 이해하기 쉬운 의심 신호를 반환합니다.
+URL은 `hxxp` 변형을 복원하고 hostname을 정규화한 뒤 공식 스팸 URL CSV, 단축 URL, IP 직접 접속, punycode, 과도한 하이픈·숫자, 브랜드 유사 도메인, 인증·이벤트 path를 점수화합니다. 실제 URL 문자열이 없으면 URL 검사를 수행하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다. 응답은 정규화 URL, 도메인, 점수, 등급, 데이터 출처와 사람이 이해하기 쉬운 의심 신호를 반환합니다.
 
 ## 사업자 조회 actual API 흐름
 
 ```mermaid
 flowchart TD
-  I[사업자번호 입력] --> D{PUBLIC_DATA_MODE=actual 및 API 키 존재?}
+  I[사업자번호 입력] --> D{실제 API 키 존재?}
   D -- 아니오 --> F[조회 실패 사유 + warnings]
   D -- 예 --> P[국세청/공정위 실제 API 호출]
   P --> O{성공?}
@@ -43,7 +43,7 @@ flowchart TD
   O -- 아니오 --> F
 ```
 
-actual 모드에서는 API 실패 시 sample 데이터로 대체하지 않습니다. 성공과 실패 모두 `source`, `warnings`, `safeAction`을 제공하며 등록 확인이 거래 안전 보증이 아님을 명시합니다.
+API 실패 시 대체 데이터로 결과를 꾸미지 않습니다. 성공과 실패 모두 `source`, `warnings`, `safeAction`을 제공하며 등록 확인이 거래 안전 보증이 아님을 명시합니다.
 
 ## 개인정보 비저장과 배포
 

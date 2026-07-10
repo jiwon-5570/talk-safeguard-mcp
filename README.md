@@ -82,7 +82,7 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 | [국세청_사업자등록정보 진위확인 및 상태조회](https://www.data.go.kr/data/15081808/openapi.do) | 사업자 운영 상태 실시간 보조 조회 |
 | [공정거래위원회_통신판매사업자 등록상세](https://www.data.go.kr/data/15126315/openapi.do) | 온라인 판매자 신고·영업 상태 보조 조회 |
 
-테스트 fixture JSON은 원본 공공데이터 전체를 재배포하지 않으며, 자동 테스트에서만 데이터 형식을 검증하기 위한 레코드입니다. 운영 actual 모드의 판단 결과에는 테스트 fixture를 섞지 않습니다. 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
+운영 빌드에는 실제 판단에 필요한 키워드와 공식 스팸 URL CSV만 포함합니다. 자동 테스트용 입력은 운영 산출물에 복사하지 않으며, 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
 
 ## 설치 및 실행
 
@@ -119,19 +119,16 @@ npm start
 | `NODE_ENV` | `development` | 실행 환경 |
 | `NTS_BUSINESS_API_KEY` | 빈 값 | 국세청 공공데이터 API 키 |
 | `FTC_ONLINE_SELLER_API_KEY` | 빈 값 | 공정위 공공데이터 API 키 |
-| `PHISHING_DATA_MODE` | `actual` | actual 모드에서는 로컬 샘플 피싱 목록 미사용, 휴리스틱/공식 도메인 검증 사용 |
-| `SPAM_URL_DATA_MODE` | `actual` | actual 모드에서는 공공데이터 공식 CSV 기반 불법 스팸 URL 데이터셋 사용 |
-| `PUBLIC_DATA_MODE` | `actual` | `actual`일 때 국세청·공정위 실제 API 호출, 실패 시 sample fallback 미사용 |
 | `LOG_LEVEL` | `info` | 서버 구조 로그 수준 |
-| `ENABLE_DEBUG_ENDPOINT` | `true` | `/debug/analyze` 활성화. 운영에서는 `false` 권장 |
+| `ENABLE_DEBUG_ENDPOINT` | `false` | `/debug/analyze` 활성화. 실사용/배포에서는 `false` 유지 |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | IP 해시 기준 요청 제한 시간 |
 | `RATE_LIMIT_MAX` | `60` | 제한 시간당 최대 요청 수 |
 | `TRUST_PROXY` | `false` | 신뢰할 수 있는 단일 reverse proxy 뒤에서만 `true` |
 | `ALLOWED_ORIGINS` | 빈 값 | 쉼표 구분 Origin. 개발에서는 허용, production에서 비어 있으면 교차 출처 요청 거부 |
 
-`PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출합니다. actual 모드에서는 키가 없거나 API 호출에 실패해도 sample 데이터로 대체하지 않고, 응답의 `source`와 `warnings`에 실패 사유를 명확히 반환합니다. `PUBLIC_DATA_MODE=sample`은 테스트/데모 전용입니다.
+국세청·공정위 조회는 실제 API 키가 있을 때만 수행합니다. 키가 없거나 API 호출에 실패하면 대체 데이터로 결과를 꾸미지 않고, 응답의 `source`와 `warnings`에 실패 사유를 명확히 반환합니다.
 
-`SPAM_URL_DATA_MODE=actual`에서는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`)를 사용합니다. `PHISHING_DATA_MODE=actual`에서는 로컬 샘플 피싱 목록을 사용하지 않고 휴리스틱·공식 도메인 검증만 적용합니다. `sample-*` JSON은 테스트/데모 전용이며 운영 actual 모드에서는 사용하지 않습니다.
+URL 검사는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`), URL 정규화, 공식 도메인 허용 목록, 위험 도메인 휴리스틱을 사용합니다. 실제 URL 문자열이 입력되지 않으면 URL 검사를 수행한 것처럼 응답하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다.
 
 ## 테스트와 검증
 
@@ -160,7 +157,7 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 1. 이 서버를 외부에서 접근 가능한 HTTPS 환경에 배포합니다.
 2. `https://배포도메인/health`와 `https://배포도메인/mcp`를 확인합니다.
 3. PlayMCP 개발자 화면에서 새 MCP 서버를 만들고 Streamable HTTP 서버 URL로 `https://배포도메인/mcp`를 등록합니다.
-4. 도구 탐색 결과에 `check_kakao_message`가 첫 번째로 표시되고 위 9개 도구가 모두 나타나는지 확인한 뒤 데모 프롬프트로 호출 결과를 점검합니다.
+4. 도구 탐색 결과에 `check_kakao_message`가 첫 번째로 표시되고 위 9개 도구가 모두 나타나는지 확인한 뒤 사용 예시로 호출 결과를 점검합니다.
 5. 서비스 설명, 개인정보 처리 원칙, 이용 공공데이터와 안전 고지를 입력합니다.
 6. 공모전 제출 시 공개 범위와 참가 상태를 공식 공모전 안내에 맞게 설정합니다.
 
@@ -186,9 +183,9 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 - 사업자 조회 API를 설정한 경우 입력된 사업자등록번호는 조회를 위해 해당 공공기관 API로 전송되지만 이 서버에는 저장하지 않습니다.
 - HTTP 응답은 `Cache-Control: no-store`를 사용합니다.
 
-## 데모
+## 사용 예시
 
-발표용 입력은 [demo-prompts.md](./demo-prompts.md), 공모전 요약은 [submission-summary.md](./submission-summary.md)를 참고하세요.
+호출 예시는 [demo-prompts.md](./demo-prompts.md), 공모전 요약은 [submission-summary.md](./submission-summary.md)를 참고하세요.
 
 ## 실제 사용 예시
 
@@ -238,7 +235,7 @@ MCP 서버는 메시지 원문이나 대화 상태를 저장하지 않습니다.
 
 - 규칙과 데이터에 없는 새로운 수법을 포함해 모든 사기를 100% 탐지할 수 없습니다.
 - 정상 사업자나 통신판매업 정보도 사칭·도용될 수 있어 거래 안전을 보장하지 않습니다.
-- 피싱 URL 데이터는 최신성이 중요하며 sample 데이터는 실시간 차단 목록이 아닙니다.
+- 피싱 URL 데이터는 최신성이 중요하며 공식 데이터셋도 실시간 차단 목록을 완전히 대체하지는 못합니다.
 - LOW 결과도 안전 보증이 아니며 최종 확인은 사용자가 공식 기관·기존 연락처로 직접 해야 합니다.
 - 이미 송금·앱 설치·정보 제공이 발생했다면 은행 고객센터, 경찰 112, 금융감독원 1332 등 공식 경로를 즉시 이용해야 합니다.
 

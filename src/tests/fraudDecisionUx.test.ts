@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { analyzeMessageRiskTool } from "../mcp/tools/analyzeMessageRisk.js";
 import { checkInvestmentRoomRiskTool } from "../mcp/tools/checkInvestmentRoomRisk.js";
 import { checkPhishingUrlTool } from "../mcp/tools/checkPhishingUrl.js";
@@ -69,7 +69,6 @@ describe("사기 확인 중심 UX", () => {
   });
 
   it("URL·사업자·판매자 도구가 행동 가능 여부를 직접 반환한다", async () => {
-    vi.stubEnv("PUBLIC_DATA_MODE", "sample");
     const url = checkPhishingUrlTool({ url: "http://kakao-pay-event.example.com/verify" });
     const business = await verifyBusinessInfoTool({ businessRegistrationNumber: "123-45-67890" });
     const seller = await verifyOnlineSellerTool({ businessRegistrationNumber: "123-45-67890" });
@@ -80,7 +79,8 @@ describe("사기 확인 중심 UX", () => {
     expect(business.remainingRisks.join(" ")).toContain("거래 안전을 보장하지 않습니다");
     expect(seller.canProceedWithPurchase).toBe("CHECK_FIRST");
     expect(seller.safePurchaseChecklist.length).toBeGreaterThan(2);
-    vi.unstubAllEnvs();
+    expect(business.warnings.join(" ")).not.toMatch(/샘플|sample|데모/u);
+    expect(seller.warnings.join(" ")).not.toMatch(/샘플|sample|데모/u);
   });
 
   it("상황별 행동 가이드가 공유문보다 행동·확인·신고를 우선한다", () => {

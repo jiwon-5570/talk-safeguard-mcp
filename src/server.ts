@@ -113,7 +113,7 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_business_info",
     {
       title: "사업자등록 상태 확인",
-      description: serviceToolDescription("국세청 사업자등록정보 API로 사업자등록 상태를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다."),
+      description: serviceToolDescription("국세청 사업자등록정보 API로 사업자등록 상태를 보조 확인합니다. 실제 API 실패 시 가짜 데이터로 대체하지 않습니다."),
       annotations: readOnlyToolAnnotations("톡세이프가드 사업자등록 상태 확인", true),
       inputSchema: VerifyBusinessInputSchema,
     },
@@ -123,7 +123,7 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_online_seller",
     {
       title: "통신판매사업자 확인",
-      description: serviceToolDescription("공정거래위원회 통신판매사업자 등록상세 API로 통신판매업 등록 여부를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다."),
+      description: serviceToolDescription("공정거래위원회 통신판매사업자 등록상세 API로 통신판매업 등록 여부를 보조 확인합니다. 실제 API 실패 시 가짜 데이터로 대체하지 않습니다."),
       annotations: readOnlyToolAnnotations("톡세이프가드 통신판매사업자 확인", true),
       inputSchema: VerifyOnlineSellerInputSchema,
     },
@@ -162,16 +162,16 @@ function configuredOrigins(): Set<string> {
   );
 }
 
-function envPositiveInteger(name: string, fallback: number): number {
+function envPositiveInteger(name: string, defaultValue: number): number {
   const value = Number.parseInt(process.env[name] ?? "", 10);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
+  return Number.isFinite(value) && value > 0 ? value : defaultValue;
 }
 
-function envFlag(name: string, fallback: boolean): boolean {
+function envFlag(name: string, defaultValue: boolean): boolean {
   const value = process.env[name]?.trim().toLowerCase();
   if (value === "true" || value === "1" || value === "yes") return true;
   if (value === "false" || value === "0" || value === "no") return false;
-  return fallback;
+  return defaultValue;
 }
 
 interface RateLimitEntry {
@@ -290,18 +290,17 @@ export function createHttpApp() {
       purpose: SERVICE_DESCRIPTION,
       privacyMode: "no-message-storage",
       dataMode: {
-        phishing: process.env.PHISHING_DATA_MODE ?? "actual",
-        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "actual",
-        publicData: process.env.PUBLIC_DATA_MODE ?? "actual",
-        business: "actual-api-no-sample-fallback",
-        onlineSeller: "actual-api-no-sample-fallback",
+        phishing: "official-dataset-and-heuristic-only",
+        spamUrl: "official-spam-url-dataset-only",
+        business: "actual-api-only",
+        onlineSeller: "actual-api-only",
       },
       safetyPolicy: "risk-signal-only-no-fraud-certification",
     });
   });
 
   app.post("/debug/analyze", async (request, response) => {
-    if (!envFlag("ENABLE_DEBUG_ENDPOINT", !production)) {
+    if (!envFlag("ENABLE_DEBUG_ENDPOINT", false)) {
       response.status(404).json({ error: "요청한 endpoint를 찾을 수 없습니다." });
       return;
     }

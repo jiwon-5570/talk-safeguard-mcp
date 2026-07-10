@@ -9,6 +9,7 @@ describe("check_phishing_url", () => {
     expect(["HIGH", "CRITICAL"]).toContain(result.riskLevel);
     expect(result.matchedDataSource).toBe("official-spam-url-dataset");
     expect(result.riskScore).toBeGreaterThanOrEqual(60);
+    expect(result.networkFetchPolicy).toContain("직접 접속하지");
   });
 
   it("공식 서비스와 유사한 비공식 도메인을 탐지한다", () => {

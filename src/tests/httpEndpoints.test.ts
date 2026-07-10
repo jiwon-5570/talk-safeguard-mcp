@@ -37,7 +37,7 @@ describe("HTTP 운영 endpoint", () => {
     expect(body["timestamp"]).toEqual(expect.any(String));
   });
 
-  it("/mcp/info가 8개 도구와 데이터 모드를 공개한다", async () => {
+  it("/mcp/info가 9개 도구와 실제 데이터 모드를 공개한다", async () => {
     const baseUrl = await startApp();
     const response = await fetch(`${baseUrl}/mcp/info`);
     const body = await response.json() as { version: string; primaryTool: string; toolCount: number; tools: string[]; privacyMode: string; dataMode: Record<string, string> };
@@ -48,8 +48,10 @@ describe("HTTP 운영 endpoint", () => {
     expect(body.primaryTool).toBe("check_kakao_message");
     expect(body.toolCount).toBe(9);
     expect(body.privacyMode).toBe("no-message-storage");
-    expect(body.dataMode["business"]).toBe("actual-api-no-sample-fallback");
-    expect(body.dataMode["onlineSeller"]).toBe("actual-api-no-sample-fallback");
+    expect(body.dataMode["phishing"]).toBe("official-dataset-and-heuristic-only");
+    expect(body.dataMode["spamUrl"]).toBe("official-spam-url-dataset-only");
+    expect(body.dataMode["business"]).toBe("actual-api-only");
+    expect(body.dataMode["onlineSeller"]).toBe("actual-api-only");
   });
 
   it("/debug/analyze가 종합·추출·분류·URL 분석을 묶어 반환한다", async () => {
@@ -76,6 +78,16 @@ describe("HTTP 운영 endpoint", () => {
 
   it("ENABLE_DEBUG_ENDPOINT=false이면 debug endpoint를 숨긴다", async () => {
     vi.stubEnv("ENABLE_DEBUG_ENDPOINT", "false");
+    const baseUrl = await startApp();
+    const response = await fetch(`${baseUrl}/debug/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "테스트" }),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it("debug endpoint는 명시적으로 켜지 않으면 숨긴다", async () => {
     const baseUrl = await startApp();
     const response = await fetch(`${baseUrl}/debug/analyze`, {
       method: "POST",

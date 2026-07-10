@@ -1,14 +1,7 @@
 import type { CanProceed, RiskLevel } from "../mcp/schemas.js";
-import { loadJsonData } from "../utils/dataLoader.js";
 import { tryNormalizeUrl } from "../utils/normalizeUrl.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
 import { getSpamUrlDataSource, matchSpamUrlPatterns } from "./spamUrlService.js";
-
-interface PhishingSample {
-  url: string;
-  source: string;
-  category: string;
-}
 
 export interface PhishingUrlAnalysis {
   normalizedUrl: string;
@@ -23,9 +16,9 @@ export interface PhishingUrlAnalysis {
   domainSummary: string;
   officialCheckGuide: string[];
   safeAction: string;
+  networkFetchPolicy: string;
 }
 
-const samples = loadJsonData<PhishingSample[]>("sample-phishing-urls.json");
 const shorteners = new Set(["bit.ly", "tinyurl.com", "t.co", "url.kr", "han.gl", "vo.la", "me2.do", "me2.kr"]);
 const officialDomains: Record<string, string[]> = {
   kakao: ["kakao.com", "kakao.co.kr", "kakaocorp.com"],
@@ -38,17 +31,6 @@ const officialDomains: Record<string, string[]> = {
 
 function isDomainOrSubdomain(hostname: string, allowed: string): boolean {
   return hostname === allowed || hostname.endsWith(`.${allowed}`);
-}
-
-function knownSampleMatch(normalizedUrl: string): PhishingSample | undefined {
-  if (process.env.PHISHING_DATA_MODE?.trim().toLowerCase() !== "sample") return undefined;
-  const target = new URL(normalizedUrl);
-  return samples.find((sample) => {
-    const normalizedSample = tryNormalizeUrl(sample.url);
-    if (!normalizedSample.valid) return false;
-    const candidate = new URL(normalizedSample.normalizedUrl);
-    return target.hostname === candidate.hostname && target.pathname.startsWith(candidate.pathname);
-  });
 }
 
 export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
@@ -67,6 +49,7 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
       domainSummary: "도메인을 정상적으로 추출하지 못했습니다.",
       officialCheckGuide: ["메시지의 링크 대신 해당 기관의 공식 앱이나 직접 입력한 공식 홈페이지를 이용하세요."],
       safeAction: "링크를 열지 말고 발신자가 주장하는 기관의 공식 앱이나 대표번호에서 직접 확인하세요.",
+      networkFetchPolicy: "사용자 보호와 서버 보안을 위해 입력 URL에 직접 접속하지 않습니다.",
     };
   }
 
@@ -79,7 +62,6 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
   const addSignal = (signal: string, weight: number): void => {
     weightedSignals.set(signal, Math.max(weightedSignals.get(signal) ?? 0, weight));
   };
-  const matchedSample = knownSampleMatch(normalized.normalizedUrl);
   const spamSignals = matchSpamUrlPatterns(normalized.normalizedUrl);
   for (const signal of spamSignals) addSignal(signal, 60);
 
@@ -104,16 +86,11 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
     }
   }
 
-  if (matchedSample) addSignal("로컬 피싱 URL 데모 데이터와 일치합니다.", 95);
   const suspiciousSignals = [...weightedSignals.keys()];
   const riskScore = clampRiskScore([...weightedSignals.values()].reduce((sum, weight) => sum + weight, 0));
   const riskLevel = scoreToRiskLevel(riskScore);
-  const matchedKnownPattern = matchedSample !== undefined || spamSignals.length > 0;
-  const matchedDataSource = matchedSample !== undefined
-    ? `sample-phishing-urls: ${matchedSample.source}`
-    : spamSignals.length > 0
-      ? getSpamUrlDataSource()
-      : "heuristic";
+  const matchedKnownPattern = spamSignals.length > 0;
+  const matchedDataSource = spamSignals.length > 0 ? getSpamUrlDataSource() : "heuristic";
   const canOpen: CanProceed = riskLevel === "HIGH" || riskLevel === "CRITICAL"
     ? "NO"
     : riskLevel === "LOW" && isOfficialDomain
@@ -150,6 +127,7 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
       riskLevel === "LOW"
         ? "링크만으로 안전을 보장할 수 없으므로 공식 앱이나 직접 입력한 공식 주소에서 한 번 더 확인하세요."
         : "링크를 열지 말고 발신자가 주장하는 기관의 공식 앱이나 대표번호에서 직접 확인하세요.",
+    networkFetchPolicy: "사용자 보호와 서버 보안을 위해 입력 URL에 직접 접속하지 않고 정규화·공식 데이터·도메인 규칙으로만 점검합니다.",
   };
   return base;
 }
