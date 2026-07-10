@@ -64,6 +64,20 @@ describe("analyze_message_risk", () => {
     expect(result.scamTypes).toContain("KAKAO_BRAND_IMPERSONATION");
     expect(result.prohibitedActions.join(" ")).toContain("링크");
     expect(result.reasons.join(" ")).toContain("본인");
+    expect(result.urlChecks.length).toBeGreaterThan(0);
+  });
+
+  it("실제 URL 없이 링크만 언급하면 URL 검사 불가로 응답한다", () => {
+    const result = analyzeMessageRiskTool({
+      message: "카카오페이 이벤트 당첨이라며 링크가 왔어.",
+      userQuestion: "이 링크 눌러도 돼?",
+    });
+
+    expect(result.verdict).toBe("INSUFFICIENT_INFO");
+    expect(result.canProceed).toBe("CHECK_FIRST");
+    expect(result.inputWarnings.join(" ")).toContain("실제 URL 문자열이 없어");
+    expect(result.urlChecks).toHaveLength(0);
+    expect(result.userQuestionAnswer).toContain("URL 안전성을 테스트할 수 없습니다");
   });
 
   it("모바일 부고 링크를 HIGH 이상으로 판단한다", () => {

@@ -16,11 +16,25 @@
 - 이거 사기야?
 - 송금해도 돼?
 - 사업자번호가 있으면 믿어도 돼?
+- 이 쇼핑몰 믿어도 돼?
+- 인증번호 입력해도 돼?
+- 앱 설치해도 돼?
 - 이 투자방 들어가도 돼?
 - 이미 링크를 눌렀는데 어떻게 해?
+- 이미 돈을 보냈는데 어떻게 해?
 - 신고해야 하면 어떤 내용을 정리해야 해?
 
-톡세이프가드는 사기 확정 판정을 내리지 않습니다. 대신 위험 신호, 확인 체크리스트, 지금 하면 안 되는 행동, 다음 행동을 안내합니다.
+톡세이프가드는 사기 확정 판정을 내리지 않습니다. 대신 첫 줄 결론, 위험 신호, 확인 체크리스트, 지금 하면 안 되는 행동, 다음 행동, 공유용 요약을 안내합니다.
+
+대표 응답은 사용자가 바로 행동할 수 있도록 아래 순서로 읽으면 됩니다.
+
+1. `answerHeadline`: “누르지 마세요”, “송금하지 마세요” 같은 첫 줄 결론
+2. `simpleConclusion`: 왜 지금 멈춰야 하는지에 대한 짧은 설명
+3. `emergencyAction`: 이미 눌렀거나 보냈을 때 지금 해야 할 조치
+4. `officialCheckSteps`: 공식 앱·홈페이지·고객센터에서 확인하는 절차
+5. `shareSummary`: 가족이나 지인에게 그대로 공유할 수 있는 짧은 요약
+
+실제 URL 문자열이 입력되지 않고 “링크가 왔다”는 설명만 있는 경우에는 URL 검사를 완료한 것처럼 응답하지 않습니다. 이때는 `INSUFFICIENT_INFO`, `inputWarnings`, 빈 `urlChecks`를 반환하고 실제 URL 또는 메시지 원문을 다시 요청합니다.
 
 ## 문제 정의
 
@@ -31,17 +45,18 @@
 ## 해결 방법
 
 1. 메시지에서 URL, 금액, 긴급 표현, 사칭 표현, 사업자등록번호, 전화·계좌번호 후보를 메모리에서 일시 추출합니다.
-2. 피싱·불법 스팸 URL 샘플과 도메인 휴리스틱을 적용합니다.
+2. 추출된 실제 URL을 정규화하고 공식 스팸 URL 데이터셋·도메인 휴리스틱으로 검사합니다.
 3. 명시된 가중치와 위험 조합으로 0~100점 및 `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` 등급을 계산합니다.
 4. 가족 사칭, 기관 사칭, 배송 스미싱, 대출, 투자 리딩방, 쇼핑·중고 선입금, 인증번호, 원격 앱 설치 유형을 분류합니다.
 5. 질문에 대한 직접 답변, 진행 가능 여부, 확인 체크리스트, 금지 행동, 다음 행동과 상담·신고 요약문을 생성합니다.
 
 AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 MVP입니다. 향후 AI 분류를 추가하더라도 최종 안전 문구와 점수 경계는 서버 규칙이 통제하도록 설계했습니다.
 
-## MCP 도구 8개
+## MCP 도구 9개
 
 | 도구 | 역할 |
 |---|---|
+| `check_kakao_message` | 대표 통합 도구. 메시지와 질문을 받아 판단, 진행 가능 여부, 근거, 체크리스트와 다음 행동을 한 번에 반환 |
 | `analyze_message_risk` | “눌러도 되는지·송금해도 되는지·믿어도 되는지”에 대한 판단 요약, 근거, 체크리스트와 다음 행동 생성 |
 | `extract_risk_indicators` | URL, 전화·계좌·사업자번호 후보, 금액, 긴급·민감정보 요구 추출 |
 | `check_phishing_url` | URL 위험도와 클릭 가능 여부, 도메인 근거, 공식 확인 절차 반환 |
@@ -53,19 +68,21 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 
 모든 도구 응답은 `safetyMessage`와 `disclaimer`를 포함합니다.
 
-`analyze_message_risk`의 핵심 응답은 `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
+처음 사용하는 클라이언트는 `check_kakao_message`를 호출하면 됩니다. 세부 URL·사업자·통신판매업·투자 분석이 필요할 때 나머지 전문 도구를 이어서 사용할 수 있습니다.
+
+`analyze_message_risk`와 대표 `check_kakao_message`의 핵심 응답은 `answerHeadline`, `simpleConclusion`, `decisionSummary`, `verdict`, `canProceed`, `userQuestionAnswer`, `shareSummary`, `emergencyAction`, `officialCheckSteps`, `inputWarnings`, `urlChecks`, `verificationChecklist`, `evidenceSummary`, `nextStepGuide`, `incidentReportSummary` 순서로 활용할 수 있습니다. `familyShareMessage`는 기존 클라이언트 호환을 위한 deprecated 필드이며 핵심 안내로 사용하지 않습니다.
 
 ## 활용 공공데이터 5개
 
 | 데이터 | MVP 활용 |
 |---|---|
-| [한국인터넷진흥원_피싱사이트 URL](https://www.data.go.kr/data/15109780/fileData.do) | 로컬 샘플 및 피싱 URL 패턴 점검 |
+| [한국인터넷진흥원_피싱사이트 URL](https://www.data.go.kr/data/15109780/fileData.do) | 피싱 URL 데이터 구조 참고 및 공식 도메인·URL 휴리스틱 설계 |
 | [통신 빅데이터플랫폼_불법 스팸 URL 데이터셋](https://www.data.go.kr/data/15134609/fileData.do) | `hxxp`, 스미싱 URL 패턴 및 단축 URL 규칙 |
 | [경찰청_보이스피싱 현황](https://www.data.go.kr/data/15063815/fileData.do) | 문제 근거 및 기관사칭·대출사기·메신저피싱 분류 참고 |
 | [국세청_사업자등록정보 진위확인 및 상태조회](https://www.data.go.kr/data/15081808/openapi.do) | 사업자 운영 상태 실시간 보조 조회 |
 | [공정거래위원회_통신판매사업자 등록상세](https://www.data.go.kr/data/15126315/openapi.do) | 온라인 판매자 신고·영업 상태 보조 조회 |
 
-샘플 JSON은 원본 공공데이터 전체를 재배포하지 않으며, 데이터 형식과 위험 패턴을 설명하기 위한 데모 레코드입니다. 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
+테스트 fixture JSON은 원본 공공데이터 전체를 재배포하지 않으며, 자동 테스트에서만 데이터 형식을 검증하기 위한 레코드입니다. 운영 actual 모드의 판단 결과에는 테스트 fixture를 섞지 않습니다. 실제 데이터 이용 조건과 최신 명세는 각 제공기관에서 확인해야 합니다. 법무부 보이스피싱 사례 데이터는 범위에서 제외했습니다.
 
 ## 설치 및 실행
 
@@ -102,9 +119,9 @@ npm start
 | `NODE_ENV` | `development` | 실행 환경 |
 | `NTS_BUSINESS_API_KEY` | 빈 값 | 국세청 공공데이터 API 키 |
 | `FTC_ONLINE_SELLER_API_KEY` | 빈 값 | 공정위 공공데이터 API 키 |
-| `PHISHING_DATA_MODE` | `sample` | 피싱 데이터 모드(현재 MVP는 sample) |
-| `SPAM_URL_DATA_MODE` | `sample` | 스팸 URL 데이터 모드(현재 MVP는 sample) |
-| `PUBLIC_DATA_MODE` | `sample` | `actual`일 때만 국세청·공정위 API 호출, 실패 시 sample fallback |
+| `PHISHING_DATA_MODE` | `actual` | actual 모드에서는 로컬 샘플 피싱 목록 미사용, 휴리스틱/공식 도메인 검증 사용 |
+| `SPAM_URL_DATA_MODE` | `actual` | actual 모드에서는 공공데이터 공식 CSV 기반 불법 스팸 URL 데이터셋 사용 |
+| `PUBLIC_DATA_MODE` | `actual` | `actual`일 때 국세청·공정위 실제 API 호출, 실패 시 sample fallback 미사용 |
 | `LOG_LEVEL` | `info` | 서버 구조 로그 수준 |
 | `ENABLE_DEBUG_ENDPOINT` | `true` | `/debug/analyze` 활성화. 운영에서는 `false` 권장 |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | IP 해시 기준 요청 제한 시간 |
@@ -112,7 +129,9 @@ npm start
 | `TRUST_PROXY` | `false` | 신뢰할 수 있는 단일 reverse proxy 뒤에서만 `true` |
 | `ALLOWED_ORIGINS` | 빈 값 | 쉼표 구분 Origin. 개발에서는 허용, production에서 비어 있으면 교차 출처 요청 거부 |
 
-`PUBLIC_DATA_MODE=sample`에서는 API 키 유무와 관계없이 재현 가능한 로컬 sample fallback을 사용합니다. `PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출하며, 키가 없거나 호출에 실패하면 서버 전체 장애 없이 sample fallback으로 전환합니다. 응답의 `source`와 `warnings`에서 실제 조회인지 fallback인지 확인할 수 있습니다.
+`PUBLIC_DATA_MODE=actual`과 해당 API 키를 함께 설정하면 실제 국세청·공정위 API를 호출합니다. actual 모드에서는 키가 없거나 API 호출에 실패해도 sample 데이터로 대체하지 않고, 응답의 `source`와 `warnings`에 실패 사유를 명확히 반환합니다. `PUBLIC_DATA_MODE=sample`은 테스트/데모 전용입니다.
+
+`SPAM_URL_DATA_MODE=actual`에서는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`)를 사용합니다. `PHISHING_DATA_MODE=actual`에서는 로컬 샘플 피싱 목록을 사용하지 않고 휴리스틱·공식 도메인 검증만 적용합니다. `sample-*` JSON은 테스트/데모 전용이며 운영 actual 모드에서는 사용하지 않습니다.
 
 ## 테스트와 검증
 
@@ -123,7 +142,7 @@ npm run validate
 npm run build
 ```
 
-`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, MCP 도구 8개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
+`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, 대표 도구를 포함한 MCP 도구 9개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
 
 ## Docker
 
@@ -141,7 +160,7 @@ PlayMCP 화면과 심사 절차는 바뀔 수 있으므로 제출 시 [PlayMCP �
 1. 이 서버를 외부에서 접근 가능한 HTTPS 환경에 배포합니다.
 2. `https://배포도메인/health`와 `https://배포도메인/mcp`를 확인합니다.
 3. PlayMCP 개발자 화면에서 새 MCP 서버를 만들고 Streamable HTTP 서버 URL로 `https://배포도메인/mcp`를 등록합니다.
-4. 도구 탐색 결과에 위 8개 도구가 모두 나타나는지 확인하고, 데모 프롬프트로 호출 결과를 점검합니다.
+4. 도구 탐색 결과에 `check_kakao_message`가 첫 번째로 표시되고 위 9개 도구가 모두 나타나는지 확인한 뒤 데모 프롬프트로 호출 결과를 점검합니다.
 5. 서비스 설명, 개인정보 처리 원칙, 이용 공공데이터와 안전 고지를 입력합니다.
 6. 공모전 제출 시 공개 범위와 참가 상태를 공식 공모전 안내에 맞게 설정합니다.
 
@@ -234,4 +253,4 @@ MCP 서버는 메시지 원문이나 대화 상태를 저장하지 않습니다.
 - [ ] `/health` 확인
 - [ ] `/mcp/info` 확인
 - [ ] `/mcp` 등록 확인
-- [ ] MCP tool 8개 확인
+- [ ] 대표 `check_kakao_message`와 MCP tool 9개 확인

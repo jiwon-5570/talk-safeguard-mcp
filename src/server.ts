@@ -1,9 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import { analyzeMessageRiskTool } from "./mcp/tools/analyzeMessageRisk.js";
+import { checkKakaoMessageTool } from "./mcp/tools/checkKakaoMessage.js";
 import { checkInvestmentRoomRiskTool } from "./mcp/tools/checkInvestmentRoomRisk.js";
 import { checkPhishingUrlTool } from "./mcp/tools/checkPhishingUrl.js";
 import { classifyScamTypeTool } from "./mcp/tools/classifyScamType.js";
@@ -13,6 +15,7 @@ import { verifyBusinessInfoTool } from "./mcp/tools/verifyBusinessInfo.js";
 import { verifyOnlineSellerTool } from "./mcp/tools/verifyOnlineSeller.js";
 import {
   AnalyzeMessageInputSchema,
+  CheckKakaoMessageInputSchema,
   CheckUrlInputSchema,
   MessageInputSchema,
   SafeActionGuideInputSchema,
@@ -24,9 +27,11 @@ import { logger } from "./utils/logger.js";
 
 export const SERVICE_NAME = "talk-safeguard-mcp";
 export const SERVICE_VERSION = "1.1.0";
-export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지 위험 신호 분석 MCP";
+export const PRIMARY_TOOL = "check_kakao_message";
+export const SERVICE_DESCRIPTION = "카카오톡 의심 메시지에 대해 눌러도 되는지, 송금해도 되는지, 믿어도 되는지를 행동 전에 확인하는 사기 위험 판단 보조 MCP";
 
 export const TOOL_NAMES = [
+  "check_kakao_message",
   "analyze_message_risk",
   "extract_risk_indicators",
   "check_phishing_url",
@@ -37,14 +42,39 @@ export const TOOL_NAMES = [
   "generate_safe_action_guide",
 ] as const;
 
+function serviceToolDescription(description: string): string {
+  return `톡세이프가드(talksafeguard) 서비스 도구입니다. ${description}`;
+}
+
+function readOnlyToolAnnotations(title: string, openWorldHint = false): ToolAnnotations {
+  return {
+    title,
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint,
+  };
+}
+
 export function createTalkSafeguardServer(): McpServer {
   const server = new McpServer({ name: SERVICE_NAME, version: SERVICE_VERSION });
 
   server.registerTool(
+    "check_kakao_message",
+    {
+      title: "카카오톡 메시지 사기 위험 확인",
+      description: serviceToolDescription("카카오톡 메시지와 사용자의 질문을 받아 눌러도 되는지, 송금해도 되는지, 믿어도 되는지에 직접 답합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 카카오톡 메시지 사기 위험 확인"),
+      inputSchema: CheckKakaoMessageInputSchema,
+    },
+    async (input) => toToolResult(checkKakaoMessageTool(input)),
+  );
+  server.registerTool(
     "analyze_message_risk",
     {
       title: "카카오톡 메시지 종합 위험 분석",
-      description: "메시지의 위험 신호를 분석하고 사용자의 질문에 진행 가능 여부, 근거, 확인 체크리스트와 다음 행동으로 답합니다.",
+      description: serviceToolDescription("메시지의 위험 신호를 분석하고 사용자의 질문에 진행 가능 여부, 근거, 확인 체크리스트와 다음 행동으로 답합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 카카오톡 메시지 종합 위험 분석"),
       inputSchema: AnalyzeMessageInputSchema,
     },
     async (input) => toToolResult(analyzeMessageRiskTool(input)),
@@ -53,7 +83,8 @@ export function createTalkSafeguardServer(): McpServer {
     "extract_risk_indicators",
     {
       title: "위험 요소 추출",
-      description: "URL, 금전 요구, 전화번호·계좌번호 후보 등 위험 분석 요소를 메모리에서만 일시 추출합니다.",
+      description: serviceToolDescription("URL, 금전 요구, 전화번호·계좌번호 후보 등 위험 분석 요소를 메모리에서만 일시 추출합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 위험 요소 추출"),
       inputSchema: MessageInputSchema,
     },
     async (input) => toToolResult(extractRiskIndicatorsTool(input)),
@@ -62,7 +93,8 @@ export function createTalkSafeguardServer(): McpServer {
     "check_phishing_url",
     {
       title: "피싱 URL 점검",
-      description: "URL을 정규화하고 의심 도메인 규칙과 비교해 링크를 열어도 되는지와 공식 확인 방법을 안내합니다.",
+      description: serviceToolDescription("URL을 정규화하고 의심 도메인 규칙과 비교해 링크를 열어도 되는지와 공식 확인 방법을 안내합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 피싱 URL 점검"),
       inputSchema: CheckUrlInputSchema,
     },
     async (input) => toToolResult(checkPhishingUrlTool(input)),
@@ -71,7 +103,8 @@ export function createTalkSafeguardServer(): McpServer {
     "classify_scam_type",
     {
       title: "의심 유형 분류",
-      description: "메시지를 가족 사칭, 기관 사칭, 스미싱, 투자 리딩방, 선입금 등 유형으로 분류합니다.",
+      description: serviceToolDescription("메시지를 가족 사칭, 기관 사칭, 스미싱, 투자 리딩방, 선입금 등 유형으로 분류합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 의심 유형 분류"),
       inputSchema: MessageInputSchema,
     },
     async (input) => toToolResult(classifyScamTypeTool(input)),
@@ -80,7 +113,8 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_business_info",
     {
       title: "사업자등록 상태 확인",
-      description: "국세청 API 또는 sample fallback으로 사업자등록 상태를 보조 확인합니다.",
+      description: serviceToolDescription("국세청 사업자등록정보 API로 사업자등록 상태를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 사업자등록 상태 확인", true),
       inputSchema: VerifyBusinessInputSchema,
     },
     async (input) => toToolResult(await verifyBusinessInfoTool(input)),
@@ -89,7 +123,8 @@ export function createTalkSafeguardServer(): McpServer {
     "verify_online_seller",
     {
       title: "통신판매사업자 확인",
-      description: "공정거래위원회 API 또는 sample fallback으로 통신판매업 등록 여부를 보조 확인합니다.",
+      description: serviceToolDescription("공정거래위원회 통신판매사업자 등록상세 API로 통신판매업 등록 여부를 보조 확인합니다. actual 모드에서는 sample fallback을 사용하지 않습니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 통신판매사업자 확인", true),
       inputSchema: VerifyOnlineSellerInputSchema,
     },
     async (input) => toToolResult(await verifyOnlineSellerTool(input)),
@@ -98,7 +133,8 @@ export function createTalkSafeguardServer(): McpServer {
     "check_investment_room_risk",
     {
       title: "투자 리딩방 위험 분석",
-      description: "원금·수익 보장, 고수익, 해외거래소 유도 신호를 분석해 투자방 참여·입금 가능 여부를 안내합니다.",
+      description: serviceToolDescription("원금·수익 보장, 고수익, 해외거래소 유도 신호를 분석해 투자방 참여·입금 가능 여부를 안내합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 투자 리딩방 위험 분석"),
       inputSchema: MessageInputSchema,
     },
     async (input) => toToolResult(checkInvestmentRoomRiskTool(input)),
@@ -107,7 +143,8 @@ export function createTalkSafeguardServer(): McpServer {
     "generate_safe_action_guide",
     {
       title: "상황별 안전 대응 가이드",
-      description: "클릭·송금·앱 설치·정보 제공 여부에 맞춰 진행 가능 여부, 즉시 행동, 확인 체크리스트와 신고 경로를 안내합니다.",
+      description: serviceToolDescription("클릭·송금·앱 설치·정보 제공 여부에 맞춰 진행 가능 여부, 즉시 행동, 확인 체크리스트와 신고 경로를 안내합니다."),
+      annotations: readOnlyToolAnnotations("톡세이프가드 상황별 안전 대응 가이드"),
       inputSchema: SafeActionGuideInputSchema,
     },
     async (input) => toToolResult(generateSafeActionGuideTool(input)),
@@ -233,6 +270,7 @@ export function createHttpApp() {
       service: SERVICE_NAME,
       version: SERVICE_VERSION,
       tools: TOOL_NAMES.length,
+      primaryTool: PRIMARY_TOOL,
       privacyMode: "no-message-storage",
       messageLogging: false,
       dataRetention: "none",
@@ -246,14 +284,17 @@ export function createHttpApp() {
       service: SERVICE_NAME,
       version: SERVICE_VERSION,
       description: SERVICE_DESCRIPTION,
+      primaryTool: PRIMARY_TOOL,
+      toolCount: TOOL_NAMES.length,
       tools: TOOL_NAMES,
+      purpose: SERVICE_DESCRIPTION,
       privacyMode: "no-message-storage",
       dataMode: {
-        phishing: process.env.PHISHING_DATA_MODE ?? "sample",
-        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "sample",
-        publicData: process.env.PUBLIC_DATA_MODE ?? "sample",
-        business: "api-or-fallback",
-        onlineSeller: "api-or-fallback",
+        phishing: process.env.PHISHING_DATA_MODE ?? "actual",
+        spamUrl: process.env.SPAM_URL_DATA_MODE ?? "actual",
+        publicData: process.env.PUBLIC_DATA_MODE ?? "actual",
+        business: "actual-api-no-sample-fallback",
+        onlineSeller: "actual-api-no-sample-fallback",
       },
       safetyPolicy: "risk-signal-only-no-fraud-certification",
     });

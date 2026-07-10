@@ -7,17 +7,17 @@ flowchart LR
   U[카카오톡 사용자/PlayMCP] --> H[Express HTTP]
   H --> S[Helmet·CORS·Rate limit]
   S --> M[Stateless /mcp]
-  M --> R[MCP tool 8개]
+  M --> R[대표 도구 + 전문 MCP tool 8개]
   R --> E[규칙·URL·공공데이터 분석]
   E --> A[판단·근거·체크리스트·다음 행동]
   A --> U
 ```
 
-`src/server.ts`가 stateless Streamable HTTP transport와 8개 tool을 등록합니다. 각 요청마다 transport와 MCP server를 연결하고 응답 종료 시 닫으므로 사용자 세션이나 메시지를 보관하지 않습니다. `/mcp/info`는 도구·데이터 모드·안전 정책을 공개하며 `/debug/analyze`는 활성화된 개발 환경에서 여러 분석 결과를 한 번에 보여줍니다.
+`src/server.ts`가 stateless Streamable HTTP transport와 대표 `check_kakao_message`를 포함한 9개 tool을 등록합니다. 각 요청마다 transport와 MCP server를 연결하고 응답 종료 시 닫으므로 사용자 세션이나 메시지를 보관하지 않습니다. `/mcp/info`는 대표 도구·도구 수·데이터 모드·안전 정책을 공개하며 `/debug/analyze`는 활성화된 개발 환경에서 여러 분석 결과를 한 번에 보여줍니다.
 
 ## MCP tool 등록 흐름
 
-`createTalkSafeguardServer()`는 입력을 Zod schema로 검증한 뒤 tool handler를 호출합니다. 모든 handler는 `withSafety()`를 거쳐 `safetyMessage`와 `disclaimer`를 포함하고 `toToolResult()`가 텍스트와 structured content를 함께 반환합니다. `scripts/validate.ts`와 MCP in-memory client가 8개 이름과 실제 `tools/list` 결과를 검증합니다.
+`createTalkSafeguardServer()`는 입력을 Zod schema로 검증한 뒤 tool handler를 호출합니다. `check_kakao_message`는 질문 의도와 기존 위험 분석을 결합하는 대표 진입점이며, 모든 handler는 `withSafety()`를 거쳐 `safetyMessage`와 `disclaimer`를 포함합니다. `scripts/validate.ts`와 MCP in-memory client가 9개 이름과 실제 `tools/list` 결과를 검증합니다.
 
 ## 위험도 점수 흐름
 
@@ -31,19 +31,19 @@ flowchart LR
 
 URL은 `hxxp` 변형을 복원하고 hostname을 정규화한 뒤 sample 피싱 URL, sample 스팸 패턴, 단축 URL, IP 직접 접속, punycode, 과도한 하이픈·숫자, 브랜드 유사 도메인, 인증·이벤트 path를 점수화합니다. 응답은 정규화 URL, 도메인, 점수, 등급, 데이터 출처와 사람이 이해하기 쉬운 의심 신호를 반환합니다.
 
-## 사업자 조회 fallback
+## 사업자 조회 actual API 흐름
 
 ```mermaid
 flowchart TD
-  I[사업자번호/상호 입력] --> D{PUBLIC_DATA_MODE=actual 및 API 키 존재?}
-  D -- 아니오 --> F[Sample fallback + warnings]
-  D -- 예 --> P[공공데이터 API 호출]
+  I[사업자번호 입력] --> D{PUBLIC_DATA_MODE=actual 및 API 키 존재?}
+  D -- 아니오 --> F[조회 실패 사유 + warnings]
+  D -- 예 --> P[국세청/공정위 실제 API 호출]
   P --> O{성공?}
   O -- 예 --> V[조회 결과 + source]
   O -- 아니오 --> F
 ```
 
-실제 조회와 fallback 모두 `source`, `warnings`, `safeAction`을 제공하며 등록 확인이 거래 안전 보증이 아님을 명시합니다.
+actual 모드에서는 API 실패 시 sample 데이터로 대체하지 않습니다. 성공과 실패 모두 `source`, `warnings`, `safeAction`을 제공하며 등록 확인이 거래 안전 보증이 아님을 명시합니다.
 
 ## 개인정보 비저장과 배포
 

@@ -2,14 +2,13 @@ import { describe, expect, it } from "vitest";
 import { checkPhishingUrlTool } from "../mcp/tools/checkPhishingUrl.js";
 
 describe("check_phishing_url", () => {
-  it("hxxp URL을 정규화하고 샘플 URL을 탐지한다", () => {
-    const result = checkPhishingUrlTool({ url: "hxxp://delivery-check-kr.example.com" });
-    expect(result.normalizedUrl).toBe("http://delivery-check-kr.example.com/");
+  it("공식 스팸 URL CSV 데이터셋과 일치하는 URL을 탐지한다", () => {
+    const result = checkPhishingUrlTool({ url: "hxxps://bit.ly/2F3ZKuZ" });
+    expect(result.normalizedUrl).toBe("https://bit.ly/2F3ZKuZ");
     expect(result.matchedKnownPattern).toBe(true);
-    expect(result.riskLevel).toBe("CRITICAL");
-    expect(result.matchedDataSource).toContain("한국인터넷진흥원");
-    expect(result.domain).toBe("delivery-check-kr.example.com");
-    expect(result.riskScore).toBeGreaterThanOrEqual(85);
+    expect(["HIGH", "CRITICAL"]).toContain(result.riskLevel);
+    expect(result.matchedDataSource).toBe("official-spam-url-dataset");
+    expect(result.riskScore).toBeGreaterThanOrEqual(60);
   });
 
   it("공식 서비스와 유사한 비공식 도메인을 탐지한다", () => {
@@ -18,12 +17,12 @@ describe("check_phishing_url", () => {
     expect(result.suspiciousSignals.join(" ")).toContain("공식 도메인");
   });
 
-  it("카카오페이 이벤트 유사 도메인을 HIGH 이상으로 판단한다", () => {
+  it("카카오페이 이벤트 유사 도메인을 휴리스틱으로 HIGH 이상 판단한다", () => {
     const result = checkPhishingUrlTool({ url: "http://kakao-pay-event.example.com/verify" });
     expect(["HIGH", "CRITICAL"]).toContain(result.riskLevel);
-    expect(result.matchedKnownPattern).toBe(true);
-    expect(result.matchedDataSource).toBe("sample-spam-url-patterns");
-    expect(result.suspiciousSignals.join(" ")).toMatch(/카카오|브랜드|이벤트/);
+    expect(result.matchedKnownPattern).toBe(false);
+    expect(result.matchedDataSource).toBe("heuristic");
+    expect(result.suspiciousSignals.join(" ")).toMatch(/kakao|공식 도메인|브랜드/u);
   });
 
   it("카카오 공식 도메인의 일반 이벤트 경로를 과도하게 경고하지 않는다", () => {

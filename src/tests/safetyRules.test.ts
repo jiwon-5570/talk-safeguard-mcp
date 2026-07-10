@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { analyzeMessageRiskTool } from "../mcp/tools/analyzeMessageRisk.js";
 import { checkInvestmentRoomRiskTool } from "../mcp/tools/checkInvestmentRoomRisk.js";
+import { checkKakaoMessageTool } from "../mcp/tools/checkKakaoMessage.js";
 import { checkPhishingUrlTool } from "../mcp/tools/checkPhishingUrl.js";
 import { classifyScamTypeTool } from "../mcp/tools/classifyScamType.js";
 import { extractRiskIndicatorsTool } from "../mcp/tools/extractRiskIndicators.js";
@@ -22,6 +23,7 @@ describe("안전 표현 및 개인정보 원칙", () => {
     vi.stubEnv("FTC_ONLINE_SELLER_API_KEY", "");
     const message = "엄마 급하게 이 계좌로 보내줘. 전화는 안 돼.";
     const outputs = [
+      checkKakaoMessageTool({ message, question: "이거 사기야?" }),
       analyzeMessageRiskTool({ message }),
       extractRiskIndicatorsTool({ message }),
       checkPhishingUrlTool({ url: "https://example.com" }),
@@ -32,7 +34,7 @@ describe("안전 표현 및 개인정보 원칙", () => {
       generateSafeActionGuideTool({ userSituation: "sent_money", riskLevel: "CRITICAL" }),
     ];
 
-    expect(outputs).toHaveLength(8);
+    expect(outputs).toHaveLength(9);
     for (const output of outputs) {
       expect(output.safetyMessage.length).toBeGreaterThan(10);
       expect(output.disclaimer).toContain("보조 판단");
