@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyzeMessageRiskTool } from "../mcp/tools/analyzeMessageRisk.js";
 import { checkInvestmentRoomRiskTool } from "../mcp/tools/checkInvestmentRoomRisk.js";
 import { checkPhishingUrlTool } from "../mcp/tools/checkPhishingUrl.js";
@@ -7,6 +7,10 @@ import { verifyBusinessInfoTool } from "../mcp/tools/verifyBusinessInfo.js";
 import { verifyOnlineSellerTool } from "../mcp/tools/verifyOnlineSeller.js";
 
 describe("사기 확인 중심 UX", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("카카오페이 사칭 링크를 누르지 말라고 직접 답한다", () => {
     const result = analyzeMessageRiskTool({
       message: "카카오페이 이벤트 당첨입니다. 아래 링크에서 본인인증하면 5만원 지급됩니다. http://kakao-pay-event.example.com",
@@ -69,6 +73,8 @@ describe("사기 확인 중심 UX", () => {
   });
 
   it("URL·사업자·판매자 도구가 행동 가능 여부를 직접 반환한다", async () => {
+    vi.stubEnv("NTS_BUSINESS_API_KEY", "");
+    vi.stubEnv("FTC_ONLINE_SELLER_API_KEY", "");
     const url = checkPhishingUrlTool({ url: "http://kakao-pay-event.example.com/verify" });
     const business = await verifyBusinessInfoTool({ businessRegistrationNumber: "123-45-67890" });
     const seller = await verifyOnlineSellerTool({ businessRegistrationNumber: "123-45-67890" });
@@ -79,6 +85,8 @@ describe("사기 확인 중심 UX", () => {
     expect(business.remainingRisks.join(" ")).toContain("거래 안전을 보장하지 않습니다");
     expect(seller.canProceedWithPurchase).toBe("CHECK_FIRST");
     expect(seller.safePurchaseChecklist.length).toBeGreaterThan(2);
+    expect(business.source).toContain("미설정");
+    expect(seller.source).toContain("공정거래위원회");
     expect(business.warnings.join(" ")).not.toMatch(/샘플|sample|데모/u);
     expect(seller.warnings.join(" ")).not.toMatch(/샘플|sample|데모/u);
   });
