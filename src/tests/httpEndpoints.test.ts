@@ -37,10 +37,54 @@ describe("HTTP 운영 endpoint", () => {
     expect(body["timestamp"]).toEqual(expect.any(String));
   });
 
+  it("/ready가 실제 API 키 설정 여부를 기준으로 준비 상태를 반환한다", async () => {
+    vi.stubEnv("NTS_BUSINESS_API_KEY", "nts-test-key");
+    vi.stubEnv("FTC_ONLINE_SELLER_API_KEY", "ftc-test-key");
+    const baseUrl = await startApp();
+    const response = await fetch(`${baseUrl}/ready`);
+    const body = await response.json() as {
+      status: string;
+      checks: {
+        toolCount: number;
+        primaryTool: string;
+        ntsBusinessApiConfigured: boolean;
+        ftcOnlineSellerApiConfigured: boolean;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.checks.toolCount).toBe(9);
+    expect(body.checks.primaryTool).toBe("check_kakao_message");
+    expect(body.checks.ntsBusinessApiConfigured).toBe(true);
+    expect(body.checks.ftcOnlineSellerApiConfigured).toBe(true);
+  });
+
+  it("/ready가 실제 API 키 누락 시 degraded를 반환한다", async () => {
+    vi.stubEnv("NTS_BUSINESS_API_KEY", "");
+    vi.stubEnv("FTC_ONLINE_SELLER_API_KEY", "");
+    const baseUrl = await startApp();
+    const response = await fetch(`${baseUrl}/ready`);
+    const body = await response.json() as { status: string };
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+  });
+
   it("/mcp/info가 9개 도구와 실제 데이터 모드를 공개한다", async () => {
+    vi.stubEnv("NTS_BUSINESS_API_KEY", "nts-test-key");
+    vi.stubEnv("FTC_ONLINE_SELLER_API_KEY", "ftc-test-key");
     const baseUrl = await startApp();
     const response = await fetch(`${baseUrl}/mcp/info`);
-    const body = await response.json() as { version: string; primaryTool: string; toolCount: number; tools: string[]; privacyMode: string; dataMode: Record<string, string> };
+    const body = await response.json() as {
+      version: string;
+      primaryTool: string;
+      toolCount: number;
+      tools: string[];
+      privacyMode: string;
+      dataMode: Record<string, string>;
+      readiness: { ntsBusinessApiConfigured: boolean; ftcOnlineSellerApiConfigured: boolean };
+    };
 
     expect(response.status).toBe(200);
     expect(body.tools).toEqual(TOOL_NAMES);
@@ -52,6 +96,8 @@ describe("HTTP 운영 endpoint", () => {
     expect(body.dataMode["spamUrl"]).toBe("official-spam-url-dataset-only");
     expect(body.dataMode["business"]).toBe("actual-api-only");
     expect(body.dataMode["onlineSeller"]).toBe("actual-api-only");
+    expect(body.readiness.ntsBusinessApiConfigured).toBe(true);
+    expect(body.readiness.ftcOnlineSellerApiConfigured).toBe(true);
   });
 
   it("/debug/analyze가 종합·추출·분류·URL 분석을 묶어 반환한다", async () => {

@@ -14,9 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PUBLIC_DATA_MODE: actual
-      PHISHING_DATA_MODE: actual
-      SPAM_URL_DATA_MODE: actual
       NTS_BUSINESS_API_KEY: ${{ secrets.NTS_BUSINESS_API_KEY }}
       FTC_ONLINE_SELLER_API_KEY: ${{ secrets.FTC_ONLINE_SELLER_API_KEY }}
     steps:

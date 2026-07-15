@@ -98,6 +98,7 @@ npm run dev
 macOS/Linux에서는 `cp .env.example .env`를 사용합니다. 서버는 기본적으로 다음 주소를 제공합니다.
 
 - 상태 확인: `GET http://localhost:3000/health`
+- 실사용 준비 확인: `GET http://localhost:3000/ready`
 - 서비스·도구 정보: `GET http://localhost:3000/mcp/info`
 - MCP Streamable HTTP: `POST http://localhost:3000/mcp`
 - 개발·심사 종합 분석: `POST http://localhost:3000/debug/analyze` (`ENABLE_DEBUG_ENDPOINT=true`일 때만)
@@ -139,7 +140,7 @@ npm run validate
 npm run build
 ```
 
-`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, 대표 도구를 포함한 MCP 도구 9개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화와 운영 보안 계층을 포함합니다.
+`validate`는 TypeScript strict 타입 검사, 테스트, 필수 문서·환경변수·endpoint, 대표 도구를 포함한 MCP 도구 9개 등록, 모든 도구의 안전 고지, 메시지 원문 직접 로그 금지 패턴을 확인합니다. 테스트는 가족 사칭, 카카오페이 사칭, 상품권, 계정 탈취, 청첩장·부고, 투자 리딩방, 택배 스미싱, 쇼핑 선입금, 정상 메시지, URL 정규화, `/ready` 준비 상태와 운영 보안 계층을 포함합니다.
 
 ## Docker
 
@@ -248,6 +249,7 @@ MCP 서버는 메시지 원문이나 대화 상태를 저장하지 않습니다.
 - [ ] `ENABLE_DEBUG_ENDPOINT=false` 권장
 - [ ] rate limit 값 설정
 - [ ] `/health` 확인
+- [ ] `/ready`가 `status: ok`를 반환하는지 확인
 - [ ] `/mcp/info` 확인
 - [ ] `/mcp` 등록 확인
 - [ ] 대표 `check_kakao_message`와 MCP tool 9개 확인

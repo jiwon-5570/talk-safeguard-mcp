@@ -174,6 +174,30 @@ function envFlag(name: string, defaultValue: boolean): boolean {
   return defaultValue;
 }
 
+function envHasValue(name: string): boolean {
+  return (process.env[name] ?? "").trim().length > 0;
+}
+
+function deploymentReadiness() {
+  const checks = {
+    toolCount: TOOL_NAMES.length,
+    primaryTool: PRIMARY_TOOL,
+    ntsBusinessApiConfigured: envHasValue("NTS_BUSINESS_API_KEY"),
+    ftcOnlineSellerApiConfigured: envHasValue("FTC_ONLINE_SELLER_API_KEY"),
+    debugEndpointEnabled: envFlag("ENABLE_DEBUG_ENDPOINT", false),
+    privacyMode: "no-message-storage",
+    runtimeDataMode: "actual-api-and-official-dataset-only",
+  };
+  const ok = checks.toolCount === 9
+    && checks.primaryTool === "check_kakao_message"
+    && checks.ntsBusinessApiConfigured
+    && checks.ftcOnlineSellerApiConfigured;
+  return {
+    status: ok ? "ok" : "degraded",
+    checks,
+  };
+}
+
 interface RateLimitEntry {
   count: number;
   resetAt: number;
@@ -279,6 +303,15 @@ export function createHttpApp() {
     });
   });
 
+  app.get("/ready", (_request, response) => {
+    const readiness = deploymentReadiness();
+    response.status(readiness.status === "ok" ? 200 : 503).json({
+      service: SERVICE_NAME,
+      version: SERVICE_VERSION,
+      ...readiness,
+    });
+  });
+
   app.get("/mcp/info", (_request, response) => {
     response.json({
       service: SERVICE_NAME,
@@ -296,6 +329,7 @@ export function createHttpApp() {
         onlineSeller: "actual-api-only",
       },
       safetyPolicy: "risk-signal-only-no-fraud-certification",
+      readiness: deploymentReadiness().checks,
     });
   });
 
