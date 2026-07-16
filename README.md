@@ -59,10 +59,10 @@ AI 모델이 없어도 동일한 규칙으로 재현 가능한 결과를 내는 
 | `check_kakao_message` | 대표 통합 도구. 메시지와 질문을 받아 판단, 진행 가능 여부, 근거, 체크리스트와 다음 행동을 한 번에 반환 |
 | `analyze_message_risk` | “눌러도 되는지·송금해도 되는지·믿어도 되는지”에 대한 판단 요약, 근거, 체크리스트와 다음 행동 생성 |
 | `extract_risk_indicators` | URL, 전화·계좌·사업자번호 후보, 금액, 긴급·민감정보 요구 추출 |
-| `check_phishing_url` | URL 위험도와 클릭 가능 여부, 도메인 근거, 공식 확인 절차 반환 |
+| `check_phishing_url` | URL 위험도와 클릭 가능 여부, 도메인 근거, 사용자정보 위장·내부주소·설치파일·리디렉션 신호, 공식 확인 절차 반환 |
 | `classify_scam_type` | 14개 구체 의심 유형과 미분류 위험 신호 분류 및 근거 반환 |
-| `verify_business_info` | 사업자 상태와 판매자 신뢰 가능 여부, 남은 위험과 거래 체크리스트 반환 |
-| `verify_online_seller` | 통신판매업 등록과 구매 진행 가능 여부, 안전구매 체크리스트 반환 |
+| `verify_business_info` | 국세청 사업자 상태를 조회하고 대표자명·개업일자가 함께 있으면 진위확인까지 수행해 거래 체크리스트 반환 |
+| `verify_online_seller` | 통신판매업 등록과 조회된 상호·대표자·주소·신고번호를 반환해 입력한 판매자 정보와 대조 |
 | `check_investment_room_risk` | 투자방 참여·입금 가능 여부와 원금 보장·고수익·외부 입금 위험 분석 |
 | `generate_safe_action_guide` | 사용자 상황별 진행 가능 여부, 즉시 행동, 확인 체크리스트와 신고 경로 생성 |
 
@@ -129,7 +129,9 @@ npm start
 
 국세청·공정위 조회는 실제 API 키가 있을 때만 수행합니다. 키가 없거나 API 호출에 실패하면 대체 데이터로 결과를 꾸미지 않고, 응답의 `source`와 `warnings`에 실패 사유를 명확히 반환합니다.
 
-URL 검사는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`), URL 정규화, 공식 도메인 허용 목록, 위험 도메인 휴리스틱을 사용합니다. 실제 URL 문자열이 입력되지 않으면 URL 검사를 수행한 것처럼 응답하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다.
+URL 검사는 공공데이터포털에서 내려받은 공식 CSV(`src/data/official-spam-urls.csv`), URL 정규화, 공식 도메인 허용 목록, 위험 도메인 휴리스틱을 사용합니다. 프로토콜이 생략된 도메인, `[.]` 비식별화, `hxxp` 변형도 추출하며 사용자정보 위장, 로컬·내부망 주소, 실행파일 다운로드, 외부 리디렉션을 추가 점검합니다. 실제 URL 문자열이 입력되지 않으면 URL 검사를 수행한 것처럼 응답하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다.
+
+`verify_business_info`의 `representativeName`과 `startDate`(`YYYYMMDD`)를 모두 입력하면 국세청 `/validate` 진위확인을 실제 호출합니다. 둘 중 하나만 입력하면 상태조회만 수행하고 누락 경고를 반환합니다. `verify_online_seller`는 공정위 정상 응답에서만 미등록 여부를 판단하며, API가 HTTP 200 본문에 오류 코드를 반환한 경우 조회 실패로 구분합니다.
 
 ## 테스트와 검증
 

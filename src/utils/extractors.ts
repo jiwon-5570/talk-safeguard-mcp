@@ -46,7 +46,12 @@ function includedKeywords(message: string, keywords: string[]): string[] {
 }
 
 export function extractUrls(message: string): string[] {
-  const matches = message.match(/(?:https?|hxxps?):\/\/[^\s<>"']+|www\.[^\s<>"']+/giu) ?? [];
+  const prepared = message
+    .replace(/\[(?:dot|점|\.)\]|\((?:dot|점|\.)\)/giu, ".")
+    .replace(/\bhxxps?\s*:\s*\/\s*\//giu, (value) => value.replace(/\s/gu, ""));
+  const matches = prepared.match(
+    /(?:https?|hxxps?):\/\/[^\s<>"']+|www\.[^\s<>"']+|(?<![@\p{L}\p{N}_-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|net|org|co\.kr|go\.kr|or\.kr|kr|io|me|app|shop|site|online|xyz|top|info|biz)(?:\/[^\s<>"']*)?/giu,
+  ) ?? [];
   return unique(
     matches.map((match) => {
       const normalized = tryNormalizeUrl(match);

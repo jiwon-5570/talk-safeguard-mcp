@@ -1,5 +1,5 @@
 import type { ReceivedVia, RiskLevel, ScamType, UserSituation } from "../mcp/schemas.js";
-import { extractRiskIndicators, scamKeywords, type RiskIndicators } from "../utils/extractors.js";
+import { extractRiskIndicators, extractUrls, scamKeywords, type RiskIndicators } from "../utils/extractors.js";
 import { processEphemeral } from "../utils/privacy.js";
 import { clampRiskScore, scoreToRiskLevel } from "../utils/scoring.js";
 import { analyzePhishingUrl } from "./phishingUrlService.js";
@@ -41,7 +41,7 @@ function present(message: string, values: string[]): string[] {
 
 function classifyRules(message: string): MatchedRule[] {
   const matches: MatchedRule[] = [];
-  const hasUrl = /(?:https?|hxxps?):\/\/|www\./iu.test(message);
+  const hasUrl = extractUrls(message).length > 0;
   const money = present(message, scamKeywords.money);
   const family = present(message, scamKeywords.family);
   const avoidance = present(message, scamKeywords.phoneAvoidance);
@@ -175,7 +175,13 @@ export function analyzeMessage(
 
     let score = 0;
     score += addReason(reasons, indicators.urls.length > 0, "메시지에 외부 URL이 포함되어 있습니다.", 10);
-    score += addReason(reasons, urlRisk.some((risk) => risk.riskLevel !== "LOW"), "URL에서 공식 데이터 또는 의심 도메인 신호가 감지되었습니다.", 15);
+    score += addReason(reasons, urlRisk.some((risk) => risk.canOpen === "NO"), "URL에서 열지 말아야 할 강한 위험 신호가 감지되었습니다.", 30);
+    score += addReason(
+      reasons,
+      !urlRisk.some((risk) => risk.canOpen === "NO") && urlRisk.some((risk) => risk.canOpen === "CHECK_FIRST"),
+      "URL의 안전성을 확인할 수 없어 공식 경로 확인이 필요합니다.",
+      15,
+    );
     score += addReason(reasons, transferRequest, "송금·입금 요구 표현이 포함되어 있습니다.", 25);
     score += addReason(reasons, indicators.bankAccountCandidates.length > 0, "계좌번호로 보이는 숫자열이 포함되어 있습니다.", 20);
     score += addReason(reasons, phoneAvoidance, "기존 전화 확인을 피하게 하는 표현이 포함되어 있습니다.", 20);

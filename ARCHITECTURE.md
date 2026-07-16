@@ -29,7 +29,7 @@ flowchart LR
 
 ## URL 분석 흐름
 
-URL은 `hxxp` 변형을 복원하고 hostname을 정규화한 뒤 공식 스팸 URL CSV, 단축 URL, IP 직접 접속, punycode, 과도한 하이픈·숫자, 브랜드 유사 도메인, 인증·이벤트 path를 점수화합니다. 실제 URL 문자열이 없으면 URL 검사를 수행하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다. 응답은 정규화 URL, 도메인, 점수, 등급, 데이터 출처와 사람이 이해하기 쉬운 의심 신호를 반환합니다.
+URL은 프로토콜 생략·`[.]` 비식별화·`hxxp` 변형을 복원하고 hostname을 정규화한 뒤 공식 스팸 URL CSV, 단축 URL, IP 직접 접속, 내부망 주소, URL 사용자정보 위장, punycode, 실행파일, 외부 리디렉션, 브랜드 유사 도메인과 인증·이벤트 path를 점수화합니다. 실제 URL 문자열이 없으면 URL 검사를 수행하지 않고 `INSUFFICIENT_INFO`와 `inputWarnings`를 반환합니다. 응답은 정규화 URL, 도메인, 점수, 등급, 데이터 출처와 사람이 이해하기 쉬운 의심 신호를 반환합니다.
 
 ## 사업자 조회 actual API 흐름
 

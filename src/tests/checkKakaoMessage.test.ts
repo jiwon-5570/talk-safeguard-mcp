@@ -106,4 +106,15 @@ describe("check_kakao_message", () => {
     expect(result.urlChecks).toHaveLength(0);
     expect(result.userQuestionAnswer).toContain("URL 안전성을 테스트할 수 없습니다");
   });
+
+  it.each([
+    "카카오 계정 확인: kakao-login-check.example.com/verify",
+    "택배 주소 확인: delivery-check[.]example.com/input",
+    "보안 확인: hxxps : //account-check.example.com/login",
+  ])("프로토콜 생략·비식별화 URL도 실제 URL로 추출해 검사한다: %s", (message) => {
+    const result = checkKakaoMessageTool({ message, question: "이 링크 눌러도 돼?" });
+    expect(result.urlChecks).toHaveLength(1);
+    expect(result.inputWarnings.join(" ")).not.toContain("실제 URL 문자열이 없어");
+    expect(result.canProceed).not.toBe("YES");
+  });
 });

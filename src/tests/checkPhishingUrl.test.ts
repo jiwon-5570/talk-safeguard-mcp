@@ -43,4 +43,16 @@ describe("check_phishing_url", () => {
     expect(result.matchedDataSource.length).toBeGreaterThan(0);
     expect(result.suspiciousSignals.length).toBeGreaterThan(0);
   });
+
+  it.each([
+    "https://kakao.com@account-check.example.com/login",
+    "http://127.0.0.1/admin",
+    "https://download.example.com/security-update.apk",
+    "https://example.com/login?redirect=https://account-check.example.net",
+  ])("사용자정보 위장·내부주소·설치파일·리디렉션 위험을 탐지한다: %s", (url) => {
+    const result = checkPhishingUrlTool({ url });
+    expect(result.canOpen).not.toBe("YES");
+    expect(result.riskScore).toBeGreaterThanOrEqual(20);
+    expect(result.suspiciousSignals.length).toBeGreaterThan(0);
+  });
 });

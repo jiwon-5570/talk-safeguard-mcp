@@ -7,9 +7,19 @@ interface OnlineSellerVerificationBase {
   source: string;
   warnings: string[];
   safeAction: string;
+  identityMatched?: boolean | null;
+  sellerDetails?: {
+    businessRegistrationNumber?: string;
+    companyName?: string;
+    representativeName?: string;
+    permitNumber?: string;
+    address?: string;
+    website?: string;
+  };
 }
 
 export interface OnlineSellerVerification extends OnlineSellerVerificationBase {
+  identityMatched: boolean | null;
   sellerDecision: string;
   canProceedWithPurchase: CanProceed;
   remainingRisks: string[];
@@ -22,10 +32,14 @@ interface UnknownRecord {
 
 function withSellerDecision(value: OnlineSellerVerificationBase): OnlineSellerVerification {
   const inactive = /휴업|폐업|취소|말소|영업정지|정지/u.test(value.status);
+  const identityMatched = value.identityMatched ?? null;
   return {
     ...value,
+    identityMatched,
     sellerDecision: inactive
       ? "통신판매사업자 상태가 정상 영업으로 확인되지 않아 구매를 진행하지 않는 것이 안전합니다."
+      : identityMatched === false
+        ? "조회된 통신판매사업자 상호가 입력한 판매자 정보와 일치하지 않습니다. 판매자 신원을 다시 확인하세요."
       : "통신판매사업자 등록 여부만으로 거래 안전을 보장할 수 없습니다. 판매자 정보와 결제 조건을 추가 확인하세요.",
     canProceedWithPurchase: inactive ? "NO" : "CHECK_FIRST",
     remainingRisks: [
@@ -84,6 +98,28 @@ function stringifyStatus(value: unknown, defaultValue: string): string {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : defaultValue;
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function normalizedCompanyName(value: string): string {
+  return value.toLocaleLowerCase("ko-KR").replace(/\(주\)|주식회사|㈜|\s+/gu, "");
+}
+
+function readApiError(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const root = payload as UnknownRecord;
+  const response = typeof root["response"] === "object" && root["response"] !== null
+    ? root["response"] as UnknownRecord
+    : root;
+  const header = typeof response["header"] === "object" && response["header"] !== null
+    ? response["header"] as UnknownRecord
+    : undefined;
+  const code = header?.["resultCode"] ?? root["resultCode"];
+  if (code === undefined || String(code) === "00" || String(code).toUpperCase() === "NORMAL_SERVICE") return undefined;
+  return `FTC_API_${String(code).replace(/[^A-Z0-9_-]/giu, "_").slice(0, 40)}`;
+}
+
 export async function verifyOnlineSellerRegistration(
   businessRegistrationNumber?: string,
   companyName?: string,
@@ -116,19 +152,36 @@ export async function verifyOnlineSellerRegistration(
     const response = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error(`FTC_HTTP_${response.status}`);
     const payload = await response.json();
+    const apiError = readApiError(payload);
+    if (apiError !== undefined) throw new Error(apiError);
     const items = findItems(payload);
     const first = items[0];
     const status = stringifyStatus(
       first?.["operSttusCdNm"] ?? first?.["bzmnRgsSttusSeNm"],
       items.length > 0 ? "등록 상세 정보 확인" : "등록 정보 없음",
     );
+    const foundCompanyName = optionalString(first?.["bzmnNm"] ?? first?.["cmpnyNm"]);
+    const identityMatched = companyName === undefined || foundCompanyName === undefined
+      ? null
+      : normalizedCompanyName(companyName) === normalizedCompanyName(foundCompanyName);
+    const sellerDetails = first === undefined ? undefined : {
+      businessRegistrationNumber: optionalString(first["brno"]),
+      companyName: foundCompanyName,
+      representativeName: optionalString(first["rprsvNm"] ?? first["rprsntvNm"]),
+      permitNumber: optionalString(first["prmmiMnno"]),
+      address: optionalString(first["lctnRnAddr"] ?? first["lctnAddr"] ?? first["adres"]),
+      website: optionalString(first["lntrnetDomainNm"] ?? first["homepageUrl"]),
+    };
     return withSellerDecision({
       registered: items.length > 0,
       status,
       source: "공정거래위원회 통신판매사업자 등록상세 제공 서비스",
+      identityMatched,
+      ...(sellerDetails === undefined ? {} : { sellerDetails }),
       warnings: [
         "통신판매업 등록이 확인되어도 거래 위험 가능성이 0이 되거나 거래 안전이 보장되는 것은 아닙니다.",
         ...(items.length === 0 ? ["입력한 사업자등록번호로 공정위 등록상세 결과가 없습니다."] : []),
+        ...(identityMatched === false ? ["입력한 상호명과 공정위 조회 결과의 상호명이 일치하지 않습니다."] : []),
       ],
       safeAction: "조회된 상호·대표자·주소가 판매자가 표시한 정보와 같은지 확인하고 안전결제를 사용하세요.",
     });

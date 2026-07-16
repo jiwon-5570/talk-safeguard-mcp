@@ -7,9 +7,13 @@ interface BusinessVerificationBase {
   source: string;
   warnings: string[];
   safeAction: string;
+  authenticity?: "MATCH" | "MISMATCH" | "NOT_CHECKED" | "UNKNOWN";
+  authenticityMessage?: string;
 }
 
 export interface BusinessVerification extends BusinessVerificationBase {
+  authenticity: "MATCH" | "MISMATCH" | "NOT_CHECKED" | "UNKNOWN";
+  authenticityMessage: string;
   businessDecision: string;
   canTrustSeller: CanProceed;
   remainingRisks: string[];
@@ -23,6 +27,17 @@ interface NtsStatusItem {
 
 interface NtsResponse {
   data?: NtsStatusItem[];
+  status_code?: string;
+}
+
+interface NtsValidationItem {
+  valid?: string;
+  valid_msg?: string;
+}
+
+interface NtsValidationResponse {
+  data?: NtsValidationItem[];
+  status_code?: string;
 }
 
 export function normalizeBusinessNumber(value: string): string {
@@ -55,14 +70,23 @@ function decodeApiKey(value: string): string {
 }
 
 function withBusinessDecision(value: BusinessVerificationBase): BusinessVerification {
-  const canTrustSeller: CanProceed = value.status === "CLOSED" || value.status === "SUSPENDED" ? "NO" : "CHECK_FIRST";
-  const businessDecision = value.status === "ACTIVE"
+  const authenticity = value.authenticity ?? "NOT_CHECKED";
+  const authenticityMessage = value.authenticityMessage
+    ?? "대표자명과 개업일자가 모두 제공되지 않아 사업자등록 진위확인은 수행하지 않았습니다.";
+  const canTrustSeller: CanProceed = value.status === "CLOSED" || value.status === "SUSPENDED" || authenticity === "MISMATCH"
+    ? "NO"
+    : "CHECK_FIRST";
+  const businessDecision = authenticity === "MISMATCH"
+    ? "입력한 대표자명·개업일자가 국세청 진위확인 결과와 일치하지 않습니다. 거래를 진행하지 말고 사업자 정보를 다시 확인하세요."
+    : value.status === "ACTIVE"
     ? "국세청 사업자등록 상태는 정상으로 확인됐지만 거래 안전을 보장하지는 않습니다. 판매자 정보와 결제 조건을 추가 확인하세요."
     : value.status === "CLOSED" || value.status === "SUSPENDED"
       ? "현재 사업자 상태로는 거래를 진행하지 않는 것이 안전합니다. 공식 조회 결과와 판매자 설명을 다시 확인하세요."
       : "사업자 상태를 충분히 확인하지 못했습니다. 확인 전에는 판매자를 신뢰하거나 송금하지 마세요.";
   return {
     ...value,
+    authenticity,
+    authenticityMessage,
     businessDecision,
     canTrustSeller,
     remainingRisks: [
@@ -90,8 +114,8 @@ function actualUnavailable(status: BusinessStatus, source: string, warnings: str
 
 export async function verifyBusinessRegistration(
   businessRegistrationNumber: string,
-  _representativeName?: string,
-  _startDate?: string,
+  representativeName?: string,
+  startDate?: string,
 ): Promise<BusinessVerification> {
   const number = normalizeBusinessNumber(businessRegistrationNumber);
   if (number.length !== 10) {
@@ -126,15 +150,51 @@ export async function verifyBusinessRegistration(
     });
     if (!response.ok) throw new Error(`NTS_HTTP_${response.status}`);
     const body = (await response.json()) as NtsResponse;
+    if (body.status_code !== undefined && body.status_code !== "OK") {
+      throw new Error(`NTS_API_${body.status_code.replace(/[^A-Z0-9_-]/giu, "_").slice(0, 40)}`);
+    }
+    if (!Array.isArray(body.data) || body.data.length === 0) throw new Error("NTS_INVALID_RESPONSE");
     const warnings = [
       ...(checksumWarning === undefined ? [] : [checksumWarning]),
       "사업자등록 상태가 정상이어도 거래 상대방의 신원이나 거래 안전을 보장하지 않습니다.",
     ];
+    let authenticity: BusinessVerification["authenticity"] = "NOT_CHECKED";
+    let authenticityMessage = "대표자명과 개업일자가 모두 제공되지 않아 사업자등록 진위확인은 수행하지 않았습니다.";
+    if ((representativeName === undefined) !== (startDate === undefined)) {
+      warnings.push("진위확인에는 대표자명과 개업일자가 모두 필요합니다. 상태조회만 수행했습니다.");
+    } else if (representativeName !== undefined && startDate !== undefined) {
+      try {
+        const validationEndpoint = new URL("https://api.odcloud.kr/api/nts-businessman/v1/validate");
+        validationEndpoint.searchParams.set("serviceKey", decodeApiKey(apiKey));
+        const validationResponse = await fetch(validationEndpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ businesses: [{ b_no: number, start_dt: startDate, p_nm: representativeName }] }),
+          signal: AbortSignal.timeout(7_000),
+        });
+        if (!validationResponse.ok) throw new Error(`NTS_VALIDATE_HTTP_${validationResponse.status}`);
+        const validationBody = (await validationResponse.json()) as NtsValidationResponse;
+        if (validationBody.status_code !== undefined && validationBody.status_code !== "OK") {
+          throw new Error(`NTS_VALIDATE_API_${validationBody.status_code.replace(/[^A-Z0-9_-]/giu, "_").slice(0, 40)}`);
+        }
+        const validation = validationBody.data?.[0];
+        if (validation === undefined) throw new Error("NTS_VALIDATE_INVALID_RESPONSE");
+        authenticity = validation.valid === "01" ? "MATCH" : "MISMATCH";
+        authenticityMessage = validation.valid_msg?.trim()
+          || (authenticity === "MATCH" ? "입력한 사업자 정보가 국세청 진위확인 결과와 일치합니다." : "입력한 사업자 정보가 국세청 진위확인 결과와 일치하지 않습니다.");
+      } catch (error) {
+        authenticity = "UNKNOWN";
+        authenticityMessage = "국세청 진위확인 호출을 완료하지 못했습니다.";
+        warnings.push(`국세청 진위확인 API 호출에 실패했습니다: ${error instanceof Error ? error.message : "UNKNOWN_ERROR"}`);
+      }
+    }
     return withBusinessDecision({
       status: mapStatus(body.data?.[0]),
       source: "국세청 사업자등록정보 진위확인 및 상태조회 API",
       warnings,
       safeAction: "사업자 상태와 통신판매 신고를 함께 확인하고 안전결제 또는 구매자 보호 수단을 사용하세요.",
+      authenticity,
+      authenticityMessage,
     });
   } catch (error) {
     return actualUnavailable("UNKNOWN", "국세청 사업자등록정보 진위확인 및 상태조회 API", [

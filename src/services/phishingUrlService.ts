@@ -33,6 +33,20 @@ function isDomainOrSubdomain(hostname: string, allowed: string): boolean {
   return hostname === allowed || hostname.endsWith(`.${allowed}`);
 }
 
+function isPrivateOrLocalHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/gu, "");
+  if (host === "localhost" || host === "::1") return true;
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [first = -1, second = -1] = parts;
+  return first === 10
+    || first === 127
+    || (first === 169 && second === 254)
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || first === 0;
+}
+
 export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
   const normalized = tryNormalizeUrl(rawUrl);
   if (!normalized.valid) {
@@ -68,11 +82,24 @@ export function analyzePhishingUrl(rawUrl: string): PhishingUrlAnalysis {
   if (/^hxxps?:/iu.test(rawUrl.trim())) addSignal("hxxp 형태로 주소를 변형해 필터 우회를 시도할 수 있습니다.", 20);
   if (shorteners.has(hostname)) addSignal("목적지를 숨길 수 있는 단축 URL입니다.", 25);
   if (/^(?:\d{1,3}\.){3}\d{1,3}$/u.test(hostname)) addSignal("도메인 대신 IP 주소를 사용합니다.", 45);
+  if (isPrivateOrLocalHost(hostname)) addSignal("내부망·로컬 주소를 가리켜 안전한 공개 웹사이트로 확인할 수 없습니다.", 60);
+  if (parsed.username.length > 0 || parsed.password.length > 0) addSignal("URL 사용자정보 영역을 이용해 실제 접속 도메인을 숨길 수 있습니다.", 50);
   if (hostname.includes("xn--")) addSignal("국제화 도메인 표기가 포함되어 문자 위장 가능성을 확인해야 합니다.", 35);
   if ((hostname.match(/-/gu) ?? []).length >= 3) addSignal("도메인에 하이픈이 과도하게 포함되어 있습니다.", 15);
   if (hostname.split(".").length >= 5) addSignal("서브도메인이 과도하게 중첩되어 있습니다.", 15);
   if ((hostname.match(/\d/gu) ?? []).length >= 5) addSignal("도메인에 숫자가 과도하게 포함되어 있습니다.", 15);
   if (parsed.protocol === "http:") addSignal("암호화되지 않은 HTTP 링크입니다.", 10);
+  if (parsed.port.length > 0 && parsed.port !== "80" && parsed.port !== "443") addSignal("일반 웹서비스와 다른 포트를 사용합니다.", 20);
+  if (/\.(?:apk|exe|msi|scr|bat|cmd|ps1|jar|dmg|pkg)$/iu.test(parsed.pathname)) {
+    addSignal("실행 파일이나 앱 설치 파일 다운로드를 유도하는 URL입니다.", 45);
+  }
+  for (const key of ["url", "redirect", "redirect_uri", "return", "return_url", "next", "continue"]) {
+    const target = parsed.searchParams.get(key);
+    if (target !== null && /^(?:https?|hxxps?):\/\//iu.test(target)) {
+      addSignal("다른 웹사이트로 이동시키는 리디렉션 주소가 포함되어 있습니다.", 25);
+      break;
+    }
+  }
   if (!isOfficialDomain && /login|verify|cert|auth|gift|event|pay|delivery/iu.test(parsed.pathname + parsed.search)) {
     addSignal("URL 경로에 로그인·인증·결제·이벤트 유도 표현이 포함되어 있습니다.", 15);
   }
